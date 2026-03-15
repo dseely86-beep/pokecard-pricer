@@ -309,7 +309,7 @@ function HomeScreen({ collection, onScan, onView }) {
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           backgroundClip: 'text', marginBottom: '8px',
         }}>PokéCard Pricer</h1>
-        <p style={{ color: '#6e7681', fontSize: '14px' }}>Scan · Identify �� Track your collection</p>
+        <p style={{ color: '#6e7681', fontSize: '14px' }}>Scan · Identify · Track your collection</p>
       </div>
 
       {/* Stats */}
@@ -401,16 +401,59 @@ function HomeScreen({ collection, onScan, onView }) {
 ═══════════════════════════════════════════════ */
 
 function ScanScreen({ onBack, onCellsReady }) {
-  const [imgSrc, setImg]  = useState(null);
-  const [busy, setBusy]   = useState(false);
-  const fileRef = useRef();
+  const [imgSrc, setImg]       = useState(null);
+  const [busy, setBusy]        = useState(false);
+  const [webcamOn, setWcamOn]  = useState(false);
+  const [stream, setStream]    = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef  = useRef();
+  const videoRef = useRef();
 
-  const handleFile = e => {
-    const f = e.target.files[0];
-    if (!f) return;
+  const isMobile = typeof window !== 'undefined' &&
+    ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+  /* ── webcam ── */
+  const startWebcam = async () => {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+      });
+      setStream(s);
+      setWcamOn(true);
+      setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = s; }, 80);
+    } catch (e) {
+      alert('Could not access camera: ' + e.message);
+    }
+  };
+
+  const stopWebcam = () => {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    setStream(null); setWcamOn(false);
+  };
+
+  const captureFrame = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    const cv = document.createElement('canvas');
+    cv.width = v.videoWidth; cv.height = v.videoHeight;
+    cv.getContext('2d').drawImage(v, 0, 0);
+    setImg(cv.toDataURL('image/jpeg', 0.92));
+    stopWebcam();
+  };
+
+  useEffect(() => () => { if (stream) stream.getTracks().forEach(t => t.stop()); }, [stream]);
+
+  /* ── file / drag ── */
+  const loadFile = f => {
+    if (!f || !f.type.startsWith('image/')) return;
     const r = new FileReader();
     r.onload = ev => setImg(ev.target.result);
     r.readAsDataURL(f);
+  };
+
+  const handleDrop = e => {
+    e.preventDefault(); setDragOver(false);
+    loadFile(e.dataTransfer.files[0]);
   };
 
   const handleProcess = async () => {
@@ -425,6 +468,41 @@ function ScanScreen({ onBack, onCellsReady }) {
     }
   };
 
+  /* ── webcam view ── */
+  if (webcamOn) return (
+    <div style={{ padding: '16px', minHeight: '100vh' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+        <button onClick={stopWebcam} style={{
+          background: 'none', border: 'none', color: '#58a6ff',
+          fontSize: '15px', cursor: 'pointer', padding: '4px 0',
+        }}>← Back</button>
+        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Camera</h2>
+      </div>
+      <div style={{
+        background: '#000', borderRadius: '14px', overflow: 'hidden',
+        marginBottom: '14px', position: 'relative',
+      }}>
+        <video ref={videoRef} autoPlay playsInline muted
+          style={{ width: '100%', display: 'block', maxHeight: '60vh', objectFit: 'cover' }}
+        />
+        <div style={{
+          position: 'absolute', inset: 0, border: '2px solid rgba(255,203,5,0.4)',
+          borderRadius: '14px', pointerEvents: 'none',
+        }} />
+      </div>
+      <p style={{ fontSize: '12px', color: '#6e7681', textAlign: 'center', marginBottom: '14px' }}>
+        Frame all 9 cards in the viewfinder, then tap capture
+      </p>
+      <button onClick={captureFrame} style={{
+        width: '100%', padding: '16px', fontSize: '16px', fontWeight: 700,
+        background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
+        color: '#0d1117', border: 'none', borderRadius: '14px', cursor: 'pointer',
+        boxShadow: '0 4px 22px rgba(255,203,5,0.28)',
+      }}>📸 Capture Photo</button>
+    </div>
+  );
+
+  /* ── main view ── */
   return (
     <div style={{ padding: '16px', minHeight: '100vh' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
@@ -449,40 +527,70 @@ function ScanScreen({ onBack, onCellsReady }) {
         9 equal sections automatically.
       </div>
 
-      {/* Upload zone */}
-      <div
-        onClick={() => !busy && fileRef.current.click()}
-        style={{
-          background: '#161b22',
-          border: `2px dashed ${imgSrc ? '#238636' : '#30363d'}`,
-          borderRadius: '14px', minHeight: '220px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: busy ? 'default' : 'pointer',
-          overflow: 'hidden', marginBottom: '14px',
-          transition: 'border-color 0.2s',
-        }}
-      >
-        {imgSrc ? (
-          <img src={imgSrc} style={{ width: '100%', maxHeight: '400px', objectFit: 'contain' }} alt="Preview" />
-        ) : (
+      {/* Upload / drop zone */}
+      {!imgSrc && (
+        <div
+          onClick={() => !busy && fileRef.current.click()}
+          onDrop={handleDrop}
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          style={{
+            background: dragOver ? '#1c2733' : '#161b22',
+            border: `2px dashed ${dragOver ? '#58a6ff' : '#30363d'}`,
+            borderRadius: '14px', minHeight: '200px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: busy ? 'default' : 'pointer',
+            overflow: 'hidden', marginBottom: '12px',
+            transition: 'border-color 0.2s, background 0.2s',
+          }}
+        >
           <div style={{ textAlign: 'center', padding: '32px', color: '#6e7681' }}>
-            <div style={{ fontSize: '56px', marginBottom: '10px' }}>📷</div>
+            <div style={{ fontSize: '48px', marginBottom: '10px' }}>📁</div>
             <div style={{ fontSize: '15px', fontWeight: 600, color: '#e6edf3', marginBottom: '5px' }}>
-              Tap to Upload Photo
+              {isMobile ? 'Tap to choose photo' : 'Click or drag & drop image'}
             </div>
-            <div style={{ fontSize: '12px' }}>Camera or photo gallery · JPG, PNG, HEIC</div>
+            <div style={{ fontSize: '12px' }}>JPG, PNG, HEIC, WEBP</div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {imgSrc && (
+        <div style={{
+          background: '#161b22', border: '2px solid #238636',
+          borderRadius: '14px', overflow: 'hidden', marginBottom: '12px',
+        }}>
+          <img src={imgSrc} style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', display: 'block' }} alt="Preview" />
+        </div>
+      )}
 
       <input
         ref={fileRef}
         type="file"
         accept="image/*"
-        capture="environment"
-        onChange={handleFile}
+        onChange={e => loadFile(e.target.files[0])}
         style={{ display: 'none' }}
       />
+
+      {/* Action buttons */}
+      {!imgSrc && (
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+          <button onClick={() => !busy && fileRef.current.click()} style={{
+            flex: 1, padding: '13px', fontSize: '14px', fontWeight: 600,
+            background: '#21262d', color: '#e6edf3',
+            border: '1px solid #30363d', borderRadius: '12px', cursor: 'pointer',
+          }}>
+            🖼️ {isMobile ? 'Photo Library' : 'Upload File'}
+          </button>
+          <button onClick={startWebcam} style={{
+            flex: 1, padding: '13px', fontSize: '14px', fontWeight: 600,
+            background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
+            color: '#0d1117', border: 'none', borderRadius: '12px', cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(255,203,5,0.22)',
+          }}>
+            📷 {isMobile ? 'Camera' : 'Use Webcam'}
+          </button>
+        </div>
+      )}
 
       {imgSrc && !busy && (
         <button onClick={() => { setImg(null); fileRef.current.value = ''; }} style={{

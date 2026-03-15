@@ -71,50 +71,61 @@ async function searchCards(query) {
   if (!query || query.trim().length < 2) return [];
   const q = query.trim();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    // Properly encode the entire query value so quotes become %22
     const r = await fetch(
-      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(`name:"${q}"`)}&pageSize=20`,
+      `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q)}`,
       { signal: controller.signal }
     );
     clearTimeout(timeout);
-    const d = await r.json();
-    if (d.data && d.data.length > 0) return d.data;
-    // Fallback: wildcard on first word (catches "Mime Jr." when user types "Mime Jr")
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (Array.isArray(data) && data.length > 0) return data.slice(0, 30);
+    // Fallback: search by first word only
     const r2 = await fetch(
-      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(`name:"${q}"*`)}&pageSize=20`
+      `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q.split(' ')[0])}`
     );
+    if (!r2.ok) return [];
     const d2 = await r2.json();
-    return d2.data || [];
+    return Array.isArray(d2) ? d2.slice(0, 30) : [];
   } catch {
     try {
-      // Last resort: simple prefix on first word only
       const r3 = await fetch(
-        `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(`name:${q.split(' ')[0]}*`)}&pageSize=20`
+        `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q.split(' ')[0])}`
       );
       const d3 = await r3.json();
-      return d3.data || [];
+      return Array.isArray(d3) ? d3.slice(0, 30) : [];
     } catch { return []; }
   }
 }
 
 function getPrice(card) {
   if (!card) return null;
-  const tp = card.tcgplayer?.prices;
-  if (tp) {
-    for (const v of ['holofoil','reverseHolofoil','normal','1stEditionHolofoil',
-                     'unlimitedHolofoil','unlimited','1stEditionNormal']) {
-      if (tp[v]?.market != null) return tp[v].market;
+  // TCGdex format
+  const p = card.pricing;
+  if (p) {
+    // TCGPlayer USD (preferred)
+    const tp = p.tcgplayer;
+    if (tp) {
+      for (const v of ['holofoil','reverseHolofoil','normal','unlimitedHolofoil',
+                       'unlimited','1stEditionHolofoil','1stEditionNormal']) {
+        if (tp[v]?.market != null) return tp[v].market;
+      }
+      for (const v of Object.keys(tp)) {
+        if (tp[v]?.market != null) return tp[v].market;
+      }
     }
-    for (const v of Object.keys(tp)) {
-      if (tp[v]?.market != null) return tp[v].market;
-      if (tp[v]?.mid != null)    return tp[v].mid;
+    // Cardmarket EUR (fallback — close enough for ballpark)
+    if (p.cardmarket?.avg != null)   return p.cardmarket.avg;
+    if (p.cardmarket?.trend != null) return p.cardmarket.trend;
+  }
+  // Legacy pokemontcg.io format (backwards compat)
+  const tpl = card.tcgplayer?.prices;
+  if (tpl) {
+    for (const v of ['holofoil','reverseHolofoil','normal']) {
+      if (tpl[v]?.market != null) return tpl[v].market;
     }
   }
-  const cm = card.cardmarket?.prices;
-  if (cm?.averageSellPrice != null) return cm.averageSellPrice;
-  if (cm?.avg1 != null) return cm.avg1;
   return null;
 }
 
@@ -140,6 +151,8 @@ const saveColl = c => { try { localStorage.setItem(STORE, JSON.stringify(c)); } 
 
 // Cache search results so the same name never hits the API twice
 const _searchCache = new Map();
+// Cache full card details (for price + set name) so each card is only fetched once
+const _detailCache = new Map();
 
 function CardIdentifier({ index, cellImg, onSelect }) {
   const [q, setQ]        = useState('');
@@ -175,10 +188,25 @@ function CardIdentifier({ index, cellImg, onSelect }) {
     return () => document.removeEventListener('pointerdown', fn);
   }, []);
 
-  const pick = card => {
-    const price = getPrice(card);
-    setSel({ card, price }); setOpen(false); setQ(''); setError('');
-    onSelect({ card, price });
+  const pick = async (basicCard) => {
+    // Confirm immediately with basic info so UX feels instant
+    const interim = { card: basicCard, price: null };
+    setSel(interim); setOpen(false); setQ(''); setError('');
+    onSelect(interim);
+    // Fetch full card detail in background for price + set name
+    try {
+      const key = basicCard.id;
+      let full = basicCard;
+      if (_detailCache.has(key)) {
+        full = _detailCache.get(key);
+      } else {
+        const r = await fetch(`https://api.tcgdex.net/v2/en/cards/${basicCard.id}`);
+        if (r.ok) { full = await r.json(); _detailCache.set(key, full); }
+      }
+      const price = getPrice(full);
+      setSel({ card: full, price });
+      onSelect({ card: full, price });
+    } catch {}
   };
   const clear = () => { setSel(null); setQ(''); setError(''); setRes([]); onSelect(null); };
 
@@ -210,8 +238,8 @@ function CardIdentifier({ index, cellImg, onSelect }) {
         {selected ? (
           /* ── Confirmed card ── */
           <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-            {selected.card.images?.small && (
-              <img src={selected.card.images.small} alt="" style={{
+            {selected.card.image && (
+              <img src={selected.card.image + '/high.webp'} alt="" style={{
                 width: '40px', height: '56px', objectFit: 'cover',
                 borderRadius: '4px', flexShrink: 0,
               }} />
@@ -222,9 +250,9 @@ function CardIdentifier({ index, cellImg, onSelect }) {
               </div>
               <div style={{ fontSize: '10px', color: '#6e7681', marginTop: '1px',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {selected.card.set?.name}
+                {selected.card.set?.name || selected.card.id?.slice(0, selected.card.id?.lastIndexOf('-'))}
               </div>
-              <div style={{ fontSize: '10px', color: '#6e7681' }}>#{selected.card.number}</div>
+              <div style={{ fontSize: '10px', color: '#6e7681' }}>#{selected.card.localId || selected.card.number}</div>
               <div style={{ fontWeight: 700, fontSize: '14px', marginTop: '4px', color: $c(selected.price) }}>
                 {$p(selected.price)}
               </div>
@@ -274,36 +302,33 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                 zIndex: 500, maxHeight: '280px', overflowY: 'auto',
                 boxShadow: '0 8px 28px rgba(0,0,0,0.6)',
               }}>
-                {results.map(card => {
-                  const p = getPrice(card);
-                  return (
-                    <div key={card.id} onClick={() => pick(card)} style={{
-                      display: 'flex', gap: '7px', padding: '7px 8px',
-                      cursor: 'pointer', borderBottom: '1px solid #30363d',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#30363d'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      {card.images?.small && (
-                        <img src={card.images.small} alt="" style={{
-                          width: '28px', height: '40px', objectFit: 'cover',
-                          borderRadius: '3px', flexShrink: 0,
-                        }} />
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: '11px', color: '#e6edf3',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {card.name}
-                        </div>
-                        <div style={{ fontSize: '10px', color: '#6e7681',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {card.set?.name} · #{card.number}
-                        </div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: $c(p) }}>{$p(p)}</div>
+                {results.map(card => (
+                  <div key={card.id} onClick={() => pick(card)} style={{
+                    display: 'flex', gap: '7px', padding: '7px 8px',
+                    cursor: 'pointer', borderBottom: '1px solid #30363d',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#30363d'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {card.image && (
+                      <img src={card.image + '/high.webp'} alt="" style={{
+                        width: '28px', height: '40px', objectFit: 'cover',
+                        borderRadius: '3px', flexShrink: 0,
+                      }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '11px', color: '#e6edf3',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {card.name}
                       </div>
+                      <div style={{ fontSize: '10px', color: '#6e7681',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {card.set?.name || card.id.slice(0, card.id.lastIndexOf('-'))} · #{card.localId || card.number}
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#484f58' }}>Tap to confirm →</div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -417,7 +442,7 @@ function HomeScreen({ collection, onScan, onView }) {
         textAlign: 'center', fontSize: '11px', color: '#484f58',
         marginTop: 'auto', paddingTop: '32px',
       }}>
-        Prices from Pokémon TCG API · USD · May vary from actual market
+        Prices via TCGdex · USD/EUR · May vary from actual market
       </p>
     </div>
   );
@@ -712,9 +737,9 @@ function IdentifyScreen({ cells, onBack, onAdd }) {
       id:        `${d.card.id}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       cardId:    d.card.id,
       name:      d.card.name,
-      set:       d.card.set?.name  || '',
-      number:    d.card.number     || '',
-      image:     d.card.images?.small || null,
+      set:       d.card.set?.name || d.card.id?.slice(0, d.card.id?.lastIndexOf('-')) || '',
+      number:    d.card.localId || d.card.number || '',
+      image:     d.card.image ? d.card.image + '/high.webp' : null,
       price:     d.price,
       scannedAt: new Date().toISOString(),
     })));

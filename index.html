@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>PokÃ©Card Pricer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+    }
+    #root { max-width: 480px; margin: 0 auto; min-height: 100vh; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { display: inline-block; animation: spin 0.7s linear infinite; }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade { animation: fadeSlide 0.18s ease; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+    input:focus { outline: none; border-color: #58a6ff !important; }
+    button:active { opacity: 0.85; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+/* âââââââââââââââââââââââââââââââââââââââââââââââ
+   UTILITIES
+âââââââââââââââââââââââââââââââââââââââââââââââ */
+
+async function splitImage(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const cw = Math.floor(img.width / 3);
+      const ch = Math.floor(img.height / 3);
+      const cells = [];
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          const cv = document.createElement('canvas');
+          cv.width = cw; cv.height = ch;
+          cv.getContext('2d').drawImage(img, c * cw, r * ch, cw, ch, 0, 0, cw, ch);
+          cells.push(cv.toDataURL('image/jpeg', 0.85));
+        }
+      }
+      res(cells);
+    };
+    img.onerror = rej;
+    img.src = src;
+  });
+}
+
+async function searchCards(query) {
+  if (!query || query.trim().length < 2) return [];
+  const q = query.trim();
+  try {
+    const r = await fetch(
+      `https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(q)}*"&pageSize=12&orderBy=-set.releaseDate`
+    );
+    const d = await r.json();
+    return d.data || [];
+  } catch {
+    try {
+      const r2 = await fetch(
+        `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(q)}*&pageSize=12`
+      );
+      const d2 = await r2.json();
+      return d2.data || [];
+    } catch { return []; }
+  }
+}
+
+function getPrice(card) {
+  if (!card) return null;
+  const tp = card.tcgplayer?.prices;
+  if (tp) {
+    for (const v of ['holofoil','reverseHolofoil','normal','1stEditionHolofoil',
+                     'unlimitedHolofoil','unlimited','1stEditionNormal']) {
+      if (tp[v]?.market != null) return tp[v].market;
+    }
+    for (const v of Object.keys(tp)) {
+      if (tp[v]?.market != null) return tp[v].market;
+      if (tp[v]?.mid != null)    return tp[v].mid;
+    }
+  }
+  const cm = card.cardmarket?.prices;
+  if (cm?.averageSellPrice != null) return cm.averageSellPrice;
+  if (cm?.avg1 != null) return cm.avg1;
+  return null;
+}
+
+const $p = p => p != null
+  ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p)
+  : 'â';
+
+const $c = p => {
+  if (p == null) return '#6e7681';
+  if (p >= 50)   return '#ffd700';
+  if (p >= 10)   return '#4fc3f7';
+  if (p >= 1)    return '#81c784';
+  return '#6e7681';
+};
+
+const STORE = 'pokepricer_v2';
+const loadColl = () => { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch { return []; } };
+const saveColl = c => { try { localStorage.setItem(STORE, JSON.stringify(c)); } catch {} };
+
+function useDebounce(v, d) {
+  const [dv, set] = useState(v);
+  useEffect(() => { const t = setTimeout(() => set(v), d); return () => clearTimeout(t); }, [v, d]);
+  return dv;
+}
+
+/* âââââââââââââââââââââââââââââââââââââââââââââââ
+   CARD IDENTIFIER (one row per cell)
+âââââââââââââââââââââââââââââââââââââââââââââââ */
+
+function CardIdentifier({ index, cellImg, onSelect }) {
+  const [q, setQ]           = useState('');
+  const [results, setRes]   = useState([]);
+  const [selected, setSel]  = useState(null);
+  const [loading, setLoad]  = useState(false);
+  const [open, setOpen]     = useState(false);
+  const dq  = useDebounce(q, 420);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (dq.length < 2) { setRes([]); setOpen(false); return; }
+    let live = true;
+    setLoad(true);
+    searchCards(dq).then(r => {
+      if (!live) return;
+      setRes(r); setOpen(r.length > 0); setLoad(false);
+    });
+    return () => { live = false; };
+  }, [dq]);
+
+  useEffect(() => {
+    const fn = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('pointerdown', fn);
+    return () => document.removeEventListener('pointerdown', fn);
+  }, []);
+
+  const pick = card => {
+    const price = getPrice(card);
+    setSel({ card, price }); setOpen(false); setQ('');
+    onSelect({ card, price });
+  };
+  const clear = () => { setSel(null); setQ(''); onSelect(null); };
+
+  return (
+    <div className="fade" style={{
+      display: 'flex', alignItems: 'flex-start', gap: '10px',
+      padding: '12px', background: '#161b22', borderRadius: '12px',
+      marginBottom: '8px',
+      border: `1px solid ${selected ? '#238636' : '#30363d'}`,
+      transition: 'border-color 0.2s',
+    }}>
+      {/* Badge */}
+      <div style={{
+        width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
+        background: selected ? '#238636' : '#21262d',
+        color: selected ? '#fff' : '#6e7681',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '10px', fontWeight: 700, marginTop: '3px',
+      }}>{index + 1}</div>
+
+      {/* Cropped cell image */}
+      <img src={cellImg} alt="" style={{
+        width: '62px', height: '86px', objectFit: 'cover',
+        borderRadius: '6px', flexShrink: 0, border: '1px solid #30363d',
+      }} />
+
+      {/* Right side */}
+      <div style={{ flex: 1, minWidth: 0 }} ref={ref}>
+        {selected ? (
+          /* ââ Confirmed card ââ */
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+            {selected.card.images?.small && (
+              <img src={selected.card.images.small} alt="" style={{
+                width: '40px', height: '56px', objectFit: 'cover',
+                borderRadius: '4px', flexShrink: 0,
+              }} />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: '12px', color: '#e6edf3', lineHeight: 1.4 }}>
+                {selected.card.name}
+              </div>
+              <div style={{ fontSize: '10px', color: '#6e7681', marginTop: '1px',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selected.card.set?.name}
+              </div>
+              <div style={{ fontSize: '10px', color: '#6e7681' }}>#{selected.card.number}</div>
+              <div style={{ fontWeight: 700, fontSize: '14px', marginTop: '4px', color: $c(selected.price) }}>
+                {$p(selected.price)}
+              </div>
+            </div>
+            <button onClick={clear} style={{
+              background: 'none', border: 'none', color: '#6e7681',
+              cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: 0, flexShrink: 0,
+            }}>â</button>
+          </div>
+        ) : (
+          /* ââ Search box ââ */
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
+              <input
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                onFocus={() => results.length > 0 && setOpen(true)}
+                placeholder="Type PokÃ©mon nameâ¦"
+                style={{
+                  width: '100%', padding: '8px 28px 8px 9px',
+                  background: '#0d1117', border: '1px solid #30363d',
+                  borderRadius: '6px', color: '#e6edf3', fontSize: '12px',
+                }}
+              />
+              {loading && (
+                <span className="spin" style={{
+                  position: 'absolute', right: '8px', top: '50%',
+                  transform: 'translateY(-50%)', fontSize: '12px', color: '#58a6ff',
+                }}>â³</span>
+              )}
+            </div>
+
+            {open && results.length > 0 && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
+                background: '#21262d', border: '1px solid #30363d', borderRadius: '8px',
+                zIndex: 500, maxHeight: '280px', overflowY: 'auto',
+                boxShadow: '0 8px 28px rgba(0,0,0,0.6)',
+              }}>
+                {results.map(card => {
+                  const p = getPrice(card);
+                  return (
+                    <div key={card.id} onClick={() => pick(card)} style={{
+                      display: 'flex', gap: '7px', padding: '7px 8px',
+                      cursor: 'pointer', borderBottom: '1px solid #30363d',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#30363d'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      {card.images?.small && (
+                        <img src={card.images.small} alt="" style={{
+                          width: '28px', height: '40px', objectFit: 'cover',
+                          borderRadius: '3px', flexShrink: 0,
+                        }} />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '11px', color: '#e6edf3',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {card.name}
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#6e7681',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {card.set?.name} Â· #{card.number}
+                        </div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: $c(p) }}>{$p(p)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* âââââââââââââââââââââââââââââââââââââââââââââââ
+   HOME SCREEN
+âââââââââââââââââââââââââââââââââââââââââââââââ */
+
+function HomeScreen({ collection, onScan, onView }) {
+  const total = useMemo(() => collection.reduce((s, c) => s + (c.price || 0), 0), [collection]);
+  const top   = useMemo(() => [...collection].sort((a, b) => (b.price || 0) - (a.price || 0))[0], [collection]);
+
+  return (
+    <div style={{ padding: '24px 16px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+
+      {/* Hero */}
+      <div style={{ textAlign: 'center', paddingTop: '36px', marginBottom: '32px' }}>
+        <div style={{
+          fontSize: '76px', lineHeight: 1, marginBottom: '12px',
+          filter: 'drop-shadow(0 0 24px rgba(255,203,5,0.35))',
+        }}>â¡</div>
+        <h1 style={{
+          fontSize: '34px', fontWeight: 900, letterSpacing: '-0.5px',
+          background: 'linear-gradient(135deg, #ffcb05 0%, #ff6b35 100%)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text', marginBottom: '8px',
+        }}>PokÃ©Card Pricer</h1>
+        <p style={{ color: '#6e7681', fontSize: '14px' }}>Scan Â· Identify · Track your collection</p>
+      </div>
+
+      {/* Stats */}
+      {collection.length > 0 && (
+        <div style={{
+          background: '#161b22', borderRadius: '16px', padding: '20px',
+          marginBottom: '20px', border: '1px solid #30363d',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: top ? '14px' : 0 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '32px', fontWeight: 900, color: '#ffcb05', lineHeight: 1 }}>
+                {collection.length}
+              </div>
+              <div style={{ fontSize: '11px', color: '#6e7681', marginTop: '3px' }}>Cards Scanned</div>
+            </div>
+            <div style={{ width: '1px', background: '#30363d' }} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '32px', fontWeight: 900, color: '#4fc3f7', lineHeight: 1 }}>
+                {$p(total)}
+              </div>
+              <div style={{ fontSize: '11px', color: '#6e7681', marginTop: '3px' }}>Total Value</div>
+            </div>
+          </div>
+
+          {/* Top card preview */}
+          {top && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              background: '#0d1117', borderRadius: '10px', padding: '10px',
+            }}>
+              <span style={{ fontSize: '16px' }}>ð</span>
+              {top.image && (
+                <img src={top.image} alt="" style={{
+                  width: '30px', height: '42px', objectFit: 'cover',
+                  borderRadius: '3px', flexShrink: 0,
+                }} />
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: '12px', fontWeight: 600, color: '#e6edf3',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{top.name}</div>
+                <div style={{
+                  fontSize: '11px', color: '#6e7681',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{top.set}</div>
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: 800, color: '#ffd700', flexShrink: 0 }}>
+                {$p(top.price)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CTA buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <button onClick={onScan} style={{
+          padding: '17px', fontSize: '16px', fontWeight: 700,
+          background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
+          color: '#0d1117', border: 'none', borderRadius: '14px', cursor: 'pointer',
+          boxShadow: '0 4px 22px rgba(255,203,5,0.28)',
+        }}>
+          ð· Scan Cards
+        </button>
+        {collection.length > 0 && (
+          <button onClick={onView} style={{
+            padding: '17px', fontSize: '16px', fontWeight: 700,
+            background: '#21262d', color: '#e6edf3',
+            border: '1px solid #30363d', borderRadius: '14px', cursor: 'pointer',
+          }}>
+            ð¦ View Collection ({collection.length})
+          </button>
+        )}
+      </div>
+
+      <p style={{
+        textAlign: 'center', fontSize: '11px', color: '#484f58',
+        marginTop: 'auto', paddingTop: '32px',
+      }}>
+        Prices from PokÃ©mon TCG API Â· USD Â· May vary from actual market
+      </p>
+    </div>
+  );
+}
+
+/* âââââââââââââââââââââââââââââââââââââââââââââââ
+   SCAN SCREEN
+âââââââââââââââââââââââââââââââââââââââââââââââ */
+
+function ScanScreen({ onBack, onCellsReady }) {
+  const [imgSrc, setImg]  = useState(null);
+  const [busy, setBusy]   = useState(false);
+  const fileRef = useRef();
+
+  const handleFile = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => setImg(ev.target.result);
+    r.readAsDataURL(f);
+  };
+
+  const handleProcess = async () => {
+    if (!imgSrc || busy) return;
+    setBusy(true);
+    try {
+      const cells = await splitImage(imgSrc);
+      onCellsReady(cells);
+    } catch {
+      alert('Could not process image. Please try again.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: '16px', minHeight: '100vh' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+        <button onClick={onBack} style={{
+          background: 'none', border: 'none', color: '#58a6ff',
+          fontSize: '15px', cursor: 'pointer', padding: '4px 0',
+        }}>â Back</button>
+        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Scan Cards</h2>
+      </div>
+
+      {/* Tips */}
+      <div style={{
+        background: '#161b22', border: '1px solid #30363d',
+        borderRadius: '10px', padding: '14px', marginBottom: '16px',
+        fontSize: '13px', color: '#8b949e', lineHeight: 1.7,
+      }}>
+        <strong style={{ color: '#e6edf3', display: 'block', marginBottom: '4px' }}>
+          ð¸ For best results:
+        </strong>
+        Lay 9 cards in a <strong style={{color:'#e6edf3'}}>3Ã3 grid</strong> on a flat surface.
+        Use good lighting, avoid glare, and fill the frame. The app will split your photo into
+        9 equal sections automatically.
+      </div>
+
+      {/* Upload zone */}
+      <div
+        onClick={() => !busy && fileRef.current.click()}
+        style={{
+          background: '#161b22',
+          border: `2px dashed ${imgSrc ? '#238636' : '#30363d'}`,
+          borderRadius: '14px', minHeight: '220px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: busy ? 'default' : 'pointer',
+          overflow: 'hidden', marginBottom: '14px',
+          transition: 'border-color 0.2s',
+        }}
+      >
+        {imgSrc ? (
+          <img src={imgSrc} style={{ width: '100%', maxHeight: '400px', objectFit: 'contain' }} alt="Preview" />
+        ) : (
+          <div style={{ textAlign: 'center', padding: '32px', color: '#6e7681' }}>
+            <div style={{ fontSize: '56px', marginBottom: '10px' }}>ð·</div>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: '#e6edf3', marginBottom: '5px' }}>
+              Tap to Upload Photo
+            </div>
+            <div style={{ fontSize: '12px' }}>Camera or photo gallery Â· JPG, PNG, HEIC</div>
+          </div>
+        )}
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFile}
+        style={{ display: 'none' }}
+      />
+
+      {imgSrc && !busy && (
+        <button onClick={() => { setImg(null); fileRef.current.value = ''; }} style={{
+          display: 'block', margin: '0 auto 10px',
+          background: 'none', border: 'none', color: '#6e7681', fontSize: '12px', cursor: 'pointer',
+        }}>Choose a different image</button>
+      )}
+
+      {imgSrc && (
+        <button onClick={handleProcess} disabled={busy} style={{
+          width: '100%', padding: '16px', fontSize: '16px', fontWeight: 700,
+          background: busy ? '#21262d' : 'linear-gradient(135deg, #ffcb05, #ff9d00)',
+          color: busy ? '#6e7681' : '#0d1117',
+          border: 'none', borderRadius: '14px',
+          cursor: busy ? 'default' : 'pointer',
+        }}>
+          {busy ? 'â³ Processingâ¦' : 'Process 9 Cards â'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* âââââââââââââââââââââââââââââââââââââââââââââââ
+   IDENTIFY SCREEN
+âââââââââââââââââââââââââââââââââââââââââââââââ */
+
+function IdentifyScreen({ cells, onBack, onAdd }) {
+  const [idents, setIdents] = useState(Array(9).fill(null));
+
+  const handleSelect = useCallback((i, data) => {
+    setIdents(prev => { const n = [...prev]; n[i] = data; return n; });
+  }, []);
+
+  const confirmed = idents.filter(Boolean);
+  const total     = confirmed.reduce((s, d) => s + (d.price || 0), 0);
+
+  const handleAdd = () => {
+    onAdd(confirmed.map(d => ({
+      id:        `${d.card.id}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      cardId:    d.card.id,
+      name:      d.card.name,
+      set:       d.card.set?.name  || '',
+      number:    d.card.number     || '',
+      image:     d.card.images?.small || null,
+      price:     d.price,
+      scannedAt: new Date().toISOString(),
+    })));
+  };
+
+  return (
+    <div style={{ padding: '16px', paddingBottom: confirmed.length > 0 ? '100px' : '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+        <button onClick={onBack} style={{
+          background: 'none', border: 'none', color: '#58a6ff',
+          fontSize: '15px', cursor: 'pointer', padding: '4px 0',
+        }}>â Back</button>
+        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Identify Cards</h2>
+        <div style={{
+          marginLeft: 'auto', background: '#21262d',
+          borderRadius: '20px', padding: '3px 10px',
+          fontSize: '11px', color: '#8b949e',
+        }}>{confirmed.length}/9</div>
+      </div>
+
+      <p style={{ fontSize: '13px', color: '#6e7681', marginBottom: '14px' }}>
+        Type the PokÃ©mon name shown on each card. Pick the correct version from the dropdown to confirm.
+      </p>
+
+      {cells.map((cell, i) => (
+        <CardIdentifier
+          key={i}
+          index={i}
+          cellImg={cell}
+          onSelect={d => handleSelect(i, d)}
+        />
+      ))}
+
+      {/* Sticky add bar */}
+      {confirmed.length > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+          width: '100%', maxWidth: '480px',
+          padding: '12px 16px', background: '#161b22',
+          borderTop: '1px solid #30363d',
+          display: 'flex', alignItems: 'center', gap: '12px',
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.4)',
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#e6edf3' }}>
+              {confirmed.length} card{confirmed.length !== 1 ? 's' : ''} identified
+            </div>
+            <div style={{ fontSize: '12px', color: '#4fc3f7' }}>Scan total: {$p(total)}</div>
+          </div>
+          <button onClick={handleAdd} style={{
+            padding: '12px 18px', fontSize: '14px', fontWeight: 700,
+            background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
+            color: '#0d1117', border: 'none', borderRadius: '10px',
+            cursor: 'pointer', flexShrink: 0,
+          }}>
+            Add to Collection â
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* âââââââââââââââââââââââââââââââââââââââââââââââ
+   COLLECTION SCREEN
+âââââââââââââââââââââââââââââââââââââââââââââââ */
+
+function CollectionScreen({ collection, onBack, onDelete, onScan }) {
+  const [confirmId, setConfirmId] = useState(null);
+
+  const sorted = useMemo(
+    () => [...collection].sort((a, b) => (b.price || 0) - (a.price || 0)),
+    [collection]
+  );
+  const total = useMemo(() => collection.reduce((s, c) => s + (c.price || 0), 0), [collection]);
+  const avg   = collection.length > 0 ? total / collection.length : 0;
+
+  const handleDelete = id => {
+    if (confirmId === id) { onDelete(id); setConfirmId(null); }
+    else setConfirmId(id);
+  };
+
+  return (
+    <div style={{ padding: '16px', paddingBottom: '90px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+        <button onClick={onBack} style={{
+          background: 'none', border: 'none', color: '#58a6ff',
+          fontSize: '15px', cursor: 'pointer', padding: '4px 0',
+        }}>â Back</button>
+        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>My Collection</h2>
+      </div>
+
+      {/* Stats bar */}
+      <div style={{
+        display: 'flex', background: '#161b22', borderRadius: '14px',
+        padding: '16px', marginBottom: '20px', border: '1px solid #30363d',
+      }}>
+        {[
+          { label: 'Cards',       value: collection.length, color: '#ffcb05' },
+          { label: 'Total Value', value: $p(total),         color: '#4fc3f7' },
+          { label: 'Avg / Card',  value: $p(avg),           color: '#81c784' },
+        ].map((s, i) => (
+          <React.Fragment key={s.label}>
+            {i > 0 && <div style={{ width: '1px', background: '#30363d', margin: '0 4px' }} />}
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: '10px', color: '#6e7681', marginTop: '3px' }}>{s.label}</div>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Empty state */}
+      {sorted.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6e7681' }}>
+          <div style={{ fontSize: '56px', marginBottom: '12px' }}>ð­</div>
+          <div style={{ fontWeight: 600, color: '#e6edf3', marginBottom: '6px' }}>No cards yet</div>
+          <div style={{ fontSize: '13px', marginBottom: '20px' }}>Start by scanning a 3Ã3 grid of cards!</div>
+          <button onClick={onScan} style={{
+            padding: '12px 24px', fontSize: '14px', fontWeight: 700,
+            background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
+            color: '#0d1117', border: 'none', borderRadius: '10px', cursor: 'pointer',
+          }}>ð· Scan Cards</button>
+        </div>
+      ) : (
+        /* Card list sorted by price */
+        sorted.map((card, idx) => (
+          <div key={card.id} className="fade" style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '11px', background: '#161b22', borderRadius: '12px',
+            marginBottom: '7px', border: '1px solid #30363d',
+          }}>
+            {/* Rank */}
+            <div style={{
+              width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0,
+              background: idx === 0 ? '#ffd700' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#cd7f32' : '#21262d',
+              color: idx < 3 ? '#0d1117' : '#6e7681',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '10px', fontWeight: 800,
+            }}>{idx + 1}</div>
+
+            {/* Card image */}
+            {card.image
+              ? <img src={card.image} alt="" style={{
+                  width: '44px', height: '62px', objectFit: 'cover',
+                  borderRadius: '4px', flexShrink: 0,
+                }} />
+              : <div style={{
+                  width: '44px', height: '62px', background: '#21262d',
+                  borderRadius: '4px', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px',
+                }}>âª</div>
+            }
+
+            {/* Name + set */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: '13px', fontWeight: 600, color: '#e6edf3',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{card.name}</div>
+              <div style={{
+                fontSize: '10px', color: '#6e7681',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{card.set}{card.number ? ` Â· #${card.number}` : ''}</div>
+              <div style={{ fontSize: '10px', color: '#484f58' }}>
+                {new Date(card.scannedAt).toLocaleDateString()}
+              </div>
+            </div>
+
+            {/* Price */}
+            <div style={{ fontSize: '14px', fontWeight: 800, color: $c(card.price), flexShrink: 0 }}>
+              {$p(card.price)}
+            </div>
+
+            {/* Delete with one-tap confirm */}
+            <button
+              onClick={() => handleDelete(card.id)}
+              onBlur={() => setConfirmId(null)}
+              style={{
+                background: confirmId === card.id ? '#f85149' : 'none',
+                border: 'none',
+                color: confirmId === card.id ? '#fff' : '#484f58',
+                cursor: 'pointer', fontSize: '11px',
+                padding: '4px 6px', borderRadius: '4px', flexShrink: 0,
+                fontWeight: confirmId === card.id ? 700 : 400,
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+              }}
+            >{confirmId === card.id ? 'Sure?' : 'â'}</button>
+          </div>
+        ))
+      )}
+
+      {/* Floating scan button */}
+      {collection.length > 0 && (
+        <button onClick={onScan} style={{
+          position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
+          padding: '13px 30px', fontSize: '14px', fontWeight: 700,
+          background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
+          color: '#0d1117', border: 'none', borderRadius: '30px', cursor: 'pointer',
+          boxShadow: '0 4px 20px rgba(255,203,5,0.28)',
+          whiteSpace: 'nowrap',
+        }}>
+          ð· Scan More Cards
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* âââââââââââââââââââââââââââââââââââââââââââââââ
+   ROOT APP
+âââââââââââââââââââââââââââââââââââââââââââââââ */
+
+function App() {
+  const [screen, setScreen] = useState('home');
+  const [cells,  setCells]  = useState([]);
+  const [collection, setColl] = useState(loadColl);
+
+  useEffect(() => { saveColl(collection); }, [collection]);
+
+  const go = s => () => setScreen(s);
+
+  if (screen === 'home') return (
+    <HomeScreen
+      collection={collection}
+      onScan={go('scan')}
+      onView={go('collection')}
+    />
+  );
+
+  if (screen === 'scan') return (
+    <ScanScreen
+      onBack={go('home')}
+      onCellsReady={c => { setCells(c); setScreen('identify'); }}
+    />
+  );
+
+  if (screen === 'identify') return (
+    <IdentifyScreen
+      cells={cells}
+      onBack={go('scan')}
+      onAdd={cards => { setColl(p => [...p, ...cards]); setScreen('collection'); }}
+    />
+  );
+
+  if (screen === 'collection') return (
+    <CollectionScreen
+      collection={collection}
+      onBack={go('home')}
+      onScan={go('scan')}
+      onDelete={id => setColl(p => p.filter(c => c.id !== id))}
+    />
+  );
+
+  return null;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

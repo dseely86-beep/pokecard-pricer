@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0d1117" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>PokÃ©Card Pricer</title>
+  <title>PokéCard Pricer</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -41,9 +41,9 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    UTILITIES
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 async function splitImage(src) {
   return new Promise((res, rej) => {
@@ -108,7 +108,7 @@ function getPrice(card) {
 
 const $p = p => p != null
   ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p)
-  : 'â';
+  : '—';
 
 const $c = p => {
   if (p == null) return '#6e7681';
@@ -128,9 +128,9 @@ function useDebounce(v, d) {
   return dv;
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    CARD IDENTIFIER (one row per cell)
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function CardIdentifier({ index, cellImg, onSelect }) {
   const [q, setQ]           = useState('');
@@ -191,7 +191,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
       {/* Right side */}
       <div style={{ flex: 1, minWidth: 0 }} ref={ref}>
         {selected ? (
-          /* ââ Confirmed card ââ */
+          /* ── Confirmed card ── */
           <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
             {selected.card.images?.small && (
               <img src={selected.card.images.small} alt="" style={{
@@ -215,17 +215,17 @@ function CardIdentifier({ index, cellImg, onSelect }) {
             <button onClick={clear} style={{
               background: 'none', border: 'none', color: '#6e7681',
               cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: 0, flexShrink: 0,
-            }}>â</button>
+            }}>✕</button>
           </div>
         ) : (
-          /* ââ Search box ââ */
+          /* ── Search box ── */
           <div style={{ position: 'relative' }}>
             <div style={{ position: 'relative' }}>
               <input
                 value={q}
                 onChange={e => setQ(e.target.value)}
                 onFocus={() => results.length > 0 && setOpen(true)}
-                placeholder="Type PokÃ©mon nameâ¦"
+                placeholder="Type Pokémon name…"
                 style={{
                   width: '100%', padding: '8px 28px 8px 9px',
                   background: '#0d1117', border: '1px solid #30363d',
@@ -236,7 +236,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                 <span className="spin" style={{
                   position: 'absolute', right: '8px', top: '50%',
                   transform: 'translateY(-50%)', fontSize: '12px', color: '#58a6ff',
-                }}>â³</span>
+                }}>⟳</span>
               )}
             </div>
 
@@ -270,7 +270,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                         </div>
                         <div style={{ fontSize: '10px', color: '#6e7681',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {card.set?.name} Â· #{card.number}
+                          {card.set?.name} · #{card.number}
                         </div>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: $c(p) }}>{$p(p)}</div>
                       </div>
@@ -286,9 +286,9 @@ function CardIdentifier({ index, cellImg, onSelect }) {
   );
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    HOME SCREEN
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function HomeScreen({ collection, onScan, onView }) {
   const total = useMemo(() => collection.reduce((s, c) => s + (c.price || 0), 0), [collection]);
@@ -302,14 +302,14 @@ function HomeScreen({ collection, onScan, onView }) {
         <div style={{
           fontSize: '76px', lineHeight: 1, marginBottom: '12px',
           filter: 'drop-shadow(0 0 24px rgba(255,203,5,0.35))',
-        }}>â¡</div>
+        }}>⚡</div>
         <h1 style={{
           fontSize: '34px', fontWeight: 900, letterSpacing: '-0.5px',
           background: 'linear-gradient(135deg, #ffcb05 0%, #ff6b35 100%)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           backgroundClip: 'text', marginBottom: '8px',
-        }}>PokÃ©Card Pricer</h1>
-        <p style={{ color: '#6e7681', fontSize: '14px' }}>Scan Â· Identify · Track your collection</p>
+        }}>PokéCard Pricer</h1>
+        <p style={{ color: '#6e7681', fontSize: '14px' }}>Scan · Identify �� Track your collection</p>
       </div>
 
       {/* Stats */}
@@ -340,7 +340,7 @@ function HomeScreen({ collection, onScan, onView }) {
               display: 'flex', alignItems: 'center', gap: '10px',
               background: '#0d1117', borderRadius: '10px', padding: '10px',
             }}>
-              <span style={{ fontSize: '16px' }}>ð</span>
+              <span style={{ fontSize: '16px' }}>👑</span>
               {top.image && (
                 <img src={top.image} alt="" style={{
                   width: '30px', height: '42px', objectFit: 'cover',
@@ -373,7 +373,7 @@ function HomeScreen({ collection, onScan, onView }) {
           color: '#0d1117', border: 'none', borderRadius: '14px', cursor: 'pointer',
           boxShadow: '0 4px 22px rgba(255,203,5,0.28)',
         }}>
-          ð· Scan Cards
+          📷 Scan Cards
         </button>
         {collection.length > 0 && (
           <button onClick={onView} style={{
@@ -381,7 +381,7 @@ function HomeScreen({ collection, onScan, onView }) {
             background: '#21262d', color: '#e6edf3',
             border: '1px solid #30363d', borderRadius: '14px', cursor: 'pointer',
           }}>
-            ð¦ View Collection ({collection.length})
+            📦 View Collection ({collection.length})
           </button>
         )}
       </div>
@@ -390,15 +390,15 @@ function HomeScreen({ collection, onScan, onView }) {
         textAlign: 'center', fontSize: '11px', color: '#484f58',
         marginTop: 'auto', paddingTop: '32px',
       }}>
-        Prices from PokÃ©mon TCG API Â· USD Â· May vary from actual market
+        Prices from Pokémon TCG API · USD · May vary from actual market
       </p>
     </div>
   );
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    SCAN SCREEN
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function ScanScreen({ onBack, onCellsReady }) {
   const [imgSrc, setImg]  = useState(null);
@@ -431,7 +431,7 @@ function ScanScreen({ onBack, onCellsReady }) {
         <button onClick={onBack} style={{
           background: 'none', border: 'none', color: '#58a6ff',
           fontSize: '15px', cursor: 'pointer', padding: '4px 0',
-        }}>â Back</button>
+        }}>← Back</button>
         <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Scan Cards</h2>
       </div>
 
@@ -442,9 +442,9 @@ function ScanScreen({ onBack, onCellsReady }) {
         fontSize: '13px', color: '#8b949e', lineHeight: 1.7,
       }}>
         <strong style={{ color: '#e6edf3', display: 'block', marginBottom: '4px' }}>
-          ð¸ For best results:
+          📸 For best results:
         </strong>
-        Lay 9 cards in a <strong style={{color:'#e6edf3'}}>3Ã3 grid</strong> on a flat surface.
+        Lay 9 cards in a <strong style={{color:'#e6edf3'}}>3×3 grid</strong> on a flat surface.
         Use good lighting, avoid glare, and fill the frame. The app will split your photo into
         9 equal sections automatically.
       </div>
@@ -466,11 +466,11 @@ function ScanScreen({ onBack, onCellsReady }) {
           <img src={imgSrc} style={{ width: '100%', maxHeight: '400px', objectFit: 'contain' }} alt="Preview" />
         ) : (
           <div style={{ textAlign: 'center', padding: '32px', color: '#6e7681' }}>
-            <div style={{ fontSize: '56px', marginBottom: '10px' }}>ð·</div>
+            <div style={{ fontSize: '56px', marginBottom: '10px' }}>📷</div>
             <div style={{ fontSize: '15px', fontWeight: 600, color: '#e6edf3', marginBottom: '5px' }}>
               Tap to Upload Photo
             </div>
-            <div style={{ fontSize: '12px' }}>Camera or photo gallery Â· JPG, PNG, HEIC</div>
+            <div style={{ fontSize: '12px' }}>Camera or photo gallery · JPG, PNG, HEIC</div>
           </div>
         )}
       </div>
@@ -499,16 +499,16 @@ function ScanScreen({ onBack, onCellsReady }) {
           border: 'none', borderRadius: '14px',
           cursor: busy ? 'default' : 'pointer',
         }}>
-          {busy ? 'â³ Processingâ¦' : 'Process 9 Cards â'}
+          {busy ? '⟳ Processing…' : 'Process 9 Cards →'}
         </button>
       )}
     </div>
   );
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    IDENTIFY SCREEN
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function IdentifyScreen({ cells, onBack, onAdd }) {
   const [idents, setIdents] = useState(Array(9).fill(null));
@@ -539,7 +539,7 @@ function IdentifyScreen({ cells, onBack, onAdd }) {
         <button onClick={onBack} style={{
           background: 'none', border: 'none', color: '#58a6ff',
           fontSize: '15px', cursor: 'pointer', padding: '4px 0',
-        }}>â Back</button>
+        }}>← Back</button>
         <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Identify Cards</h2>
         <div style={{
           marginLeft: 'auto', background: '#21262d',
@@ -549,7 +549,7 @@ function IdentifyScreen({ cells, onBack, onAdd }) {
       </div>
 
       <p style={{ fontSize: '13px', color: '#6e7681', marginBottom: '14px' }}>
-        Type the PokÃ©mon name shown on each card. Pick the correct version from the dropdown to confirm.
+        Type the Pokémon name shown on each card. Pick the correct version from the dropdown to confirm.
       </p>
 
       {cells.map((cell, i) => (
@@ -583,7 +583,7 @@ function IdentifyScreen({ cells, onBack, onAdd }) {
             color: '#0d1117', border: 'none', borderRadius: '10px',
             cursor: 'pointer', flexShrink: 0,
           }}>
-            Add to Collection â
+            Add to Collection →
           </button>
         </div>
       )}
@@ -591,9 +591,9 @@ function IdentifyScreen({ cells, onBack, onAdd }) {
   );
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    COLLECTION SCREEN
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function CollectionScreen({ collection, onBack, onDelete, onScan }) {
   const [confirmId, setConfirmId] = useState(null);
@@ -616,7 +616,7 @@ function CollectionScreen({ collection, onBack, onDelete, onScan }) {
         <button onClick={onBack} style={{
           background: 'none', border: 'none', color: '#58a6ff',
           fontSize: '15px', cursor: 'pointer', padding: '4px 0',
-        }}>â Back</button>
+        }}>← Back</button>
         <h2 style={{ fontSize: '20px', fontWeight: 700 }}>My Collection</h2>
       </div>
 
@@ -643,14 +643,14 @@ function CollectionScreen({ collection, onBack, onDelete, onScan }) {
       {/* Empty state */}
       {sorted.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6e7681' }}>
-          <div style={{ fontSize: '56px', marginBottom: '12px' }}>ð­</div>
+          <div style={{ fontSize: '56px', marginBottom: '12px' }}>📭</div>
           <div style={{ fontWeight: 600, color: '#e6edf3', marginBottom: '6px' }}>No cards yet</div>
-          <div style={{ fontSize: '13px', marginBottom: '20px' }}>Start by scanning a 3Ã3 grid of cards!</div>
+          <div style={{ fontSize: '13px', marginBottom: '20px' }}>Start by scanning a 3×3 grid of cards!</div>
           <button onClick={onScan} style={{
             padding: '12px 24px', fontSize: '14px', fontWeight: 700,
             background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
             color: '#0d1117', border: 'none', borderRadius: '10px', cursor: 'pointer',
-          }}>ð· Scan Cards</button>
+          }}>📷 Scan Cards</button>
         </div>
       ) : (
         /* Card list sorted by price */
@@ -679,7 +679,7 @@ function CollectionScreen({ collection, onBack, onDelete, onScan }) {
                   width: '44px', height: '62px', background: '#21262d',
                   borderRadius: '4px', flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px',
-                }}>âª</div>
+                }}>⚪</div>
             }
 
             {/* Name + set */}
@@ -691,7 +691,7 @@ function CollectionScreen({ collection, onBack, onDelete, onScan }) {
               <div style={{
                 fontSize: '10px', color: '#6e7681',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>{card.set}{card.number ? ` Â· #${card.number}` : ''}</div>
+              }}>{card.set}{card.number ? ` · #${card.number}` : ''}</div>
               <div style={{ fontSize: '10px', color: '#484f58' }}>
                 {new Date(card.scannedAt).toLocaleDateString()}
               </div>
@@ -716,7 +716,7 @@ function CollectionScreen({ collection, onBack, onDelete, onScan }) {
                 transition: 'all 0.2s',
                 whiteSpace: 'nowrap',
               }}
-            >{confirmId === card.id ? 'Sure?' : 'â'}</button>
+            >{confirmId === card.id ? 'Sure?' : '✕'}</button>
           </div>
         ))
       )}
@@ -731,16 +731,16 @@ function CollectionScreen({ collection, onBack, onDelete, onScan }) {
           boxShadow: '0 4px 20px rgba(255,203,5,0.28)',
           whiteSpace: 'nowrap',
         }}>
-          ð· Scan More Cards
+          📷 Scan More Cards
         </button>
       )}
     </div>
   );
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    ROOT APP
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function App() {
   const [screen, setScreen] = useState('home');

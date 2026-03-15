@@ -45,15 +45,15 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
    UTILITIES
 ═══════════════════════════════════════════════ */
 
-async function splitImage(src) {
+async function splitImage(src, rows, cols) {
   return new Promise((res, rej) => {
     const img = new Image();
     img.onload = () => {
-      const cw = Math.floor(img.width / 3);
-      const ch = Math.floor(img.height / 3);
+      const cw = Math.floor(img.width / cols);
+      const ch = Math.floor(img.height / rows);
       const cells = [];
-      for (let r = 0; r < 3; r++) {
-        for (let c = 0; c < 3; c++) {
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
           const cv = document.createElement('canvas');
           cv.width = cw; cv.height = ch;
           cv.getContext('2d').drawImage(img, c * cw, r * ch, cw, ch, 0, 0, cw, ch);
@@ -400,15 +400,50 @@ function HomeScreen({ collection, onScan, onView }) {
    SCAN SCREEN
 ═══════════════════════════════════════════════ */
 
+function Stepper({ label, value, min, max, onChange }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+      <div style={{ fontSize: '10px', color: '#6e7681', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+        <button
+          onClick={() => onChange(Math.max(min, value - 1))}
+          disabled={value <= min}
+          style={{
+            width: '32px', height: '32px', borderRadius: '8px 0 0 8px',
+            background: '#21262d', border: '1px solid #30363d', color: value <= min ? '#484f58' : '#e6edf3',
+            fontSize: '18px', cursor: value <= min ? 'default' : 'pointer', lineHeight: 1,
+          }}>−</button>
+        <div style={{
+          width: '38px', height: '32px', background: '#0d1117',
+          border: '1px solid #30363d', borderLeft: 'none', borderRight: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '16px', fontWeight: 700, color: '#e6edf3',
+        }}>{value}</div>
+        <button
+          onClick={() => onChange(Math.min(max, value + 1))}
+          disabled={value >= max}
+          style={{
+            width: '32px', height: '32px', borderRadius: '0 8px 8px 0',
+            background: '#21262d', border: '1px solid #30363d', color: value >= max ? '#484f58' : '#e6edf3',
+            fontSize: '18px', cursor: value >= max ? 'default' : 'pointer', lineHeight: 1,
+          }}>+</button>
+      </div>
+    </div>
+  );
+}
+
 function ScanScreen({ onBack, onCellsReady }) {
   const [imgSrc, setImg]       = useState(null);
   const [busy, setBusy]        = useState(false);
   const [webcamOn, setWcamOn]  = useState(false);
   const [stream, setStream]    = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [rows, setRows]        = useState(3);
+  const [cols, setCols]        = useState(3);
   const fileRef  = useRef();
   const videoRef = useRef();
 
+  const totalCards = rows * cols;
   const isMobile = typeof window !== 'undefined' &&
     ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
@@ -460,7 +495,7 @@ function ScanScreen({ onBack, onCellsReady }) {
     if (!imgSrc || busy) return;
     setBusy(true);
     try {
-      const cells = await splitImage(imgSrc);
+      const cells = await splitImage(imgSrc, rows, cols);
       onCellsReady(cells);
     } catch {
       alert('Could not process image. Please try again.');
@@ -491,7 +526,7 @@ function ScanScreen({ onBack, onCellsReady }) {
         }} />
       </div>
       <p style={{ fontSize: '12px', color: '#6e7681', textAlign: 'center', marginBottom: '14px' }}>
-        Frame all 9 cards in the viewfinder, then tap capture
+        Frame all {totalCards} card{totalCards !== 1 ? 's' : ''} ({rows}×{cols}) in the viewfinder, then tap capture
       </p>
       <button onClick={captureFrame} style={{
         width: '100%', padding: '16px', fontSize: '16px', fontWeight: 700,
@@ -513,18 +548,35 @@ function ScanScreen({ onBack, onCellsReady }) {
         <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Scan Cards</h2>
       </div>
 
+      {/* Grid picker */}
+      <div style={{
+        background: '#161b22', border: '1px solid #30363d',
+        borderRadius: '12px', padding: '14px', marginBottom: '14px',
+      }}>
+        <div style={{ fontSize: '12px', color: '#8b949e', marginBottom: '12px', textAlign: 'center' }}>
+          How are your cards laid out?
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px' }}>
+          <Stepper label="Rows" value={rows} min={1} max={8} onChange={setRows} />
+          <div style={{ fontSize: '22px', color: '#30363d', marginTop: '18px' }}>×</div>
+          <Stepper label="Cols" value={cols} min={1} max={8} onChange={setCols} />
+          <div style={{ marginTop: '18px', textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#ffcb05', lineHeight: 1 }}>{totalCards}</div>
+            <div style={{ fontSize: '10px', color: '#6e7681' }}>cards</div>
+          </div>
+        </div>
+      </div>
+
       {/* Tips */}
       <div style={{
         background: '#161b22', border: '1px solid #30363d',
-        borderRadius: '10px', padding: '14px', marginBottom: '16px',
-        fontSize: '13px', color: '#8b949e', lineHeight: 1.7,
+        borderRadius: '10px', padding: '12px', marginBottom: '14px',
+        fontSize: '12px', color: '#8b949e', lineHeight: 1.6,
       }}>
-        <strong style={{ color: '#e6edf3', display: 'block', marginBottom: '4px' }}>
-          📸 For best results:
-        </strong>
-        Lay 9 cards in a <strong style={{color:'#e6edf3'}}>3×3 grid</strong> on a flat surface.
-        Use good lighting, avoid glare, and fill the frame. The app will split your photo into
-        9 equal sections automatically.
+        <strong style={{ color: '#e6edf3' }}>📸 For best results: </strong>
+        Lay {totalCards} card{totalCards !== 1 ? 's' : ''} in a{' '}
+        <strong style={{color:'#e6edf3'}}>{rows}×{cols} grid</strong> on a flat surface.
+        Use good lighting, avoid glare, and fill the frame.
       </div>
 
       {/* Upload / drop zone */}
@@ -537,16 +589,16 @@ function ScanScreen({ onBack, onCellsReady }) {
           style={{
             background: dragOver ? '#1c2733' : '#161b22',
             border: `2px dashed ${dragOver ? '#58a6ff' : '#30363d'}`,
-            borderRadius: '14px', minHeight: '200px',
+            borderRadius: '14px', minHeight: '180px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: busy ? 'default' : 'pointer',
             overflow: 'hidden', marginBottom: '12px',
             transition: 'border-color 0.2s, background 0.2s',
           }}
         >
-          <div style={{ textAlign: 'center', padding: '32px', color: '#6e7681' }}>
-            <div style={{ fontSize: '48px', marginBottom: '10px' }}>📁</div>
-            <div style={{ fontSize: '15px', fontWeight: 600, color: '#e6edf3', marginBottom: '5px' }}>
+          <div style={{ textAlign: 'center', padding: '28px', color: '#6e7681' }}>
+            <div style={{ fontSize: '44px', marginBottom: '8px' }}>📁</div>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: '#e6edf3', marginBottom: '4px' }}>
               {isMobile ? 'Tap to choose photo' : 'Click or drag & drop image'}
             </div>
             <div style={{ fontSize: '12px' }}>JPG, PNG, HEIC, WEBP</div>
@@ -559,7 +611,7 @@ function ScanScreen({ onBack, onCellsReady }) {
           background: '#161b22', border: '2px solid #238636',
           borderRadius: '14px', overflow: 'hidden', marginBottom: '12px',
         }}>
-          <img src={imgSrc} style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', display: 'block' }} alt="Preview" />
+          <img src={imgSrc} style={{ width: '100%', maxHeight: '380px', objectFit: 'contain', display: 'block' }} alt="Preview" />
         </div>
       )}
 
@@ -607,7 +659,7 @@ function ScanScreen({ onBack, onCellsReady }) {
           border: 'none', borderRadius: '14px',
           cursor: busy ? 'default' : 'pointer',
         }}>
-          {busy ? '⟳ Processing…' : 'Process 9 Cards →'}
+          {busy ? '⟳ Processing…' : `Process ${totalCards} Card${totalCards !== 1 ? 's' : ''} →`}
         </button>
       )}
     </div>
@@ -619,7 +671,7 @@ function ScanScreen({ onBack, onCellsReady }) {
 ═══════════════════════════════════════════════ */
 
 function IdentifyScreen({ cells, onBack, onAdd }) {
-  const [idents, setIdents] = useState(Array(9).fill(null));
+  const [idents, setIdents] = useState(() => Array(cells.length).fill(null));
 
   const handleSelect = useCallback((i, data) => {
     setIdents(prev => { const n = [...prev]; n[i] = data; return n; });
@@ -653,7 +705,7 @@ function IdentifyScreen({ cells, onBack, onAdd }) {
           marginLeft: 'auto', background: '#21262d',
           borderRadius: '20px', padding: '3px 10px',
           fontSize: '11px', color: '#8b949e',
-        }}>{confirmed.length}/9</div>
+        }}>{confirmed.length}/{cells.length}</div>
       </div>
 
       <p style={{ fontSize: '13px', color: '#6e7681', marginBottom: '14px' }}>
@@ -753,7 +805,7 @@ function CollectionScreen({ collection, onBack, onDelete, onScan }) {
         <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6e7681' }}>
           <div style={{ fontSize: '56px', marginBottom: '12px' }}>📭</div>
           <div style={{ fontWeight: 600, color: '#e6edf3', marginBottom: '6px' }}>No cards yet</div>
-          <div style={{ fontSize: '13px', marginBottom: '20px' }}>Start by scanning a 3×3 grid of cards!</div>
+          <div style={{ fontSize: '13px', marginBottom: '20px' }}>Scan any number of cards to get started!</div>
           <button onClick={onScan} style={{
             padding: '12px 24px', fontSize: '14px', fontWeight: 700,
             background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',

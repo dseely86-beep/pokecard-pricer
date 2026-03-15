@@ -70,19 +70,31 @@ async function splitImage(src, rows, cols) {
 async function searchCards(query) {
   if (!query || query.trim().length < 2) return [];
   const q = query.trim();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
+    // Properly encode the entire query value so quotes become %22
     const r = await fetch(
-      `https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(q)}*"&pageSize=12&orderBy=-set.releaseDate`
+      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(`name:"${q}"`)}&pageSize=20`,
+      { signal: controller.signal }
     );
+    clearTimeout(timeout);
     const d = await r.json();
-    return d.data || [];
+    if (d.data && d.data.length > 0) return d.data;
+    // Fallback: wildcard on first word (catches "Mime Jr." when user types "Mime Jr")
+    const r2 = await fetch(
+      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(`name:"${q}"*`)}&pageSize=20`
+    );
+    const d2 = await r2.json();
+    return d2.data || [];
   } catch {
     try {
-      const r2 = await fetch(
-        `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(q)}*&pageSize=12`
+      // Last resort: simple prefix on first word only
+      const r3 = await fetch(
+        `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(`name:${q.split(' ')[0]}*`)}&pageSize=20`
       );
-      const d2 = await r2.json();
-      return d2.data || [];
+      const d3 = await r3.json();
+      return d3.data || [];
     } catch { return []; }
   }
 }

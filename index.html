@@ -37,6 +37,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
@@ -103,6 +104,28 @@ async function searchCards(query) {
   } catch { return []; }
 }
 
+async function ocrCardName(imgSrc) {
+  try {
+    // Crop top ~22% of the image — that's where the name lives on most cards
+    const img = await new Promise((res, rej) => {
+      const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = imgSrc;
+    });
+    const canvas = document.createElement('canvas');
+    const cropH = Math.max(40, Math.floor(img.height * 0.22));
+    canvas.width = img.width; canvas.height = cropH;
+    canvas.getContext('2d').drawImage(img, 0, 0, img.width, cropH, 0, 0, img.width, cropH);
+    const cropped = canvas.toDataURL('image/jpeg', 0.92);
+    const result = await Tesseract.recognize(cropped, 'eng', { logger: () => {} });
+    const raw = result.data.text || '';
+    // Clean up: remove non-name characters, pick the best candidate line
+    const lines = raw.split('\n')
+      .map(l => l.replace(/[^a-zA-Z\s'\-.éÉ]/g, ' ').trim())
+      .filter(l => l.length >= 2);
+    const name = lines.find(l => /[a-zA-Z]{2,}/.test(l) && !/^hp$/i.test(l.trim())) || lines[0] || '';
+    return name.replace(/\s+/g, ' ').trim();
+  } catch { return ''; }
+}
+
 function getPrice(card) {
   if (!card) return null;
   // TCGdex format
@@ -165,6 +188,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
   const [loading, setLoad] = useState(false);
   const [open, setOpen]   = useState(false);
   const [error, setError] = useState('');
+  const [ocrBusy, setOcrBusy] = useState(false);
   const ref = useRef(null);
 
   const doSearch = async (name) => {
@@ -285,15 +309,32 @@ function CardIdentifier({ index, cellImg, onSelect }) {
               />
               <button
                 onClick={() => doSearch(q)}
-                disabled={loading || q.trim().length < 2}
+                disabled={loading || ocrBusy || q.trim().length < 2}
                 style={{
                   padding: '8px 10px', borderRadius: '6px', border: 'none',
-                  background: loading || q.trim().length < 2 ? '#21262d' : '#1f6feb',
-                  color: loading || q.trim().length < 2 ? '#484f58' : '#fff',
-                  fontSize: '12px', fontWeight: 700, cursor: loading || q.trim().length < 2 ? 'default' : 'pointer',
+                  background: loading || ocrBusy || q.trim().length < 2 ? '#21262d' : '#1f6feb',
+                  color: loading || ocrBusy || q.trim().length < 2 ? '#484f58' : '#fff',
+                  fontSize: '12px', fontWeight: 700, cursor: loading || ocrBusy || q.trim().length < 2 ? 'default' : 'pointer',
                   flexShrink: 0, whiteSpace: 'nowrap',
                 }}
               >{loading ? '⟳' : 'Search'}</button>
+              <button
+                title="Auto-read card name"
+                disabled={ocrBusy || loading}
+                onClick={async () => {
+                  setOcrBusy(true); setError('');
+                  const name = await ocrCardName(cellImg);
+                  setOcrBusy(false);
+                  if (name && name.length >= 2) { setQ(name); doSearch(name); }
+                  else setError("Couldn't read — try typing the name");
+                }}
+                style={{
+                  padding: '8px 9px', borderRadius: '6px', border: 'none',
+                  background: '#21262d', fontSize: '14px', flexShrink: 0,
+                  color: ocrBusy ? '#484f58' : '#8b949e',
+                  cursor: ocrBusy || loading ? 'default' : 'pointer',
+                }}
+              >{ocrBusy ? '⟳' : '📷'}</button>
             </div>
 
             {error && !open && (

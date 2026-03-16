@@ -853,8 +853,10 @@ function IdentifyScreen({ cells, onBack, onAdd }) {
    COLLECTION SCREEN
 ═══════════════════════════════════════════════ */
 
-function CollectionScreen({ collection, onBack, onDelete, onScan }) {
+function CollectionScreen({ collection, onBack, onDelete, onScan, onPriceEdit }) {
   const [confirmId, setConfirmId] = useState(null);
+  const [editPriceId, setEditPriceId] = useState(null);
+  const [editPriceVal, setEditPriceVal] = useState('');
 
   const sorted = useMemo(
     () => [...collection].sort((a, b) => (b.price || 0) - (a.price || 0)),
@@ -955,10 +957,52 @@ function CollectionScreen({ collection, onBack, onDelete, onScan }) {
               </div>
             </div>
 
-            {/* Price */}
-            <div style={{ fontSize: '14px', fontWeight: 800, color: $c(card.price), flexShrink: 0 }}>
-              {$p(card.price)}
-            </div>
+            {/* Price — tap to edit */}
+            {editPriceId === card.id ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                <span style={{ fontSize: '12px', color: '#6e7681' }}>$</span>
+                <input
+                  autoFocus
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editPriceVal}
+                  onChange={e => setEditPriceVal(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const p = parseFloat(editPriceVal);
+                      onPriceEdit(card.id, isNaN(p) ? null : p);
+                      setEditPriceId(null);
+                    }
+                    if (e.key === 'Escape') setEditPriceId(null);
+                  }}
+                  style={{
+                    width: '72px', padding: '3px 5px', fontSize: '13px', fontWeight: 700,
+                    background: '#0d1117', border: '1px solid #58a6ff',
+                    borderRadius: '5px', color: '#e6edf3', textAlign: 'right',
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    const p = parseFloat(editPriceVal);
+                    onPriceEdit(card.id, isNaN(p) ? null : p);
+                    setEditPriceId(null);
+                  }}
+                  style={{
+                    background: '#1f6feb', border: 'none', borderRadius: '4px',
+                    color: '#fff', fontSize: '11px', padding: '3px 6px', cursor: 'pointer',
+                  }}
+                >✓</button>
+              </div>
+            ) : (
+              <div
+                onClick={() => { setEditPriceId(card.id); setEditPriceVal(card.price != null ? card.price.toFixed(2) : ''); }}
+                title="Tap to edit price"
+                style={{ fontSize: '14px', fontWeight: 800, color: $c(card.price), flexShrink: 0, cursor: 'pointer' }}
+              >
+                {$p(card.price)}
+              </div>
+            )}
 
             {/* Delete with one-tap confirm */}
             <button
@@ -1038,6 +1082,7 @@ function App() {
       onBack={go('home')}
       onScan={go('scan')}
       onDelete={id => setColl(p => p.filter(c => c.id !== id))}
+      onPriceEdit={(id, price) => setColl(p => p.map(c => c.id === id ? { ...c, price } : c))}
     />
   );
 

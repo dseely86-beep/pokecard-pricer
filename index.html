@@ -72,31 +72,35 @@ async function searchCards(query) {
   const q = query.trim();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
-  try {
-    const r = await fetch(
-      `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q)}`,
-      { signal: controller.signal }
-    );
-    clearTimeout(timeout);
-    if (!r.ok) return [];
-    const data = await r.json();
-    if (Array.isArray(data) && data.length > 0) return data.slice(0, 30);
-    // Fallback: search by first word only
-    const r2 = await fetch(
-      `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q.split(' ')[0])}`
-    );
-    if (!r2.ok) return [];
-    const d2 = await r2.json();
-    return Array.isArray(d2) ? d2.slice(0, 30) : [];
-  } catch {
+
+  const fetchLang = async (lang, name) => {
     try {
-      const r3 = await fetch(
-        `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q.split(' ')[0])}`
+      const r = await fetch(
+        `https://api.tcgdex.net/v2/${lang}/cards?name=${encodeURIComponent(name)}`,
+        { signal: controller.signal }
       );
-      const d3 = await r3.json();
-      return Array.isArray(d3) ? d3.slice(0, 30) : [];
+      if (!r.ok) return [];
+      const d = await r.json();
+      if (!Array.isArray(d)) return [];
+      d.forEach(c => { c._lang = lang; });
+      return d;
     } catch { return []; }
-  }
+  };
+
+  try {
+    // Search EN + JA in parallel
+    const [en, ja] = await Promise.all([fetchLang('en', q), fetchLang('ja', q)]);
+    clearTimeout(timeout);
+    const combined = [...en, ...ja];
+    if (combined.length > 0) return combined.slice(0, 40);
+
+    // Fallback: first word only
+    const [en2, ja2] = await Promise.all([
+      fetchLang('en', q.split(' ')[0]),
+      fetchLang('ja', q.split(' ')[0]),
+    ]);
+    return [...en2, ...ja2].slice(0, 40);
+  } catch { return []; }
 }
 
 function getPrice(card) {
@@ -200,8 +204,9 @@ function CardIdentifier({ index, cellImg, onSelect }) {
       if (_detailCache.has(key)) {
         full = _detailCache.get(key);
       } else {
-        const r = await fetch(`https://api.tcgdex.net/v2/en/cards/${basicCard.id}`);
-        if (r.ok) { full = await r.json(); _detailCache.set(key, full); }
+        const lang = basicCard._lang || 'en';
+        const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards/${basicCard.id}`);
+        if (r.ok) { full = await r.json(); full._lang = lang; _detailCache.set(key, full); }
       }
       const price = getPrice(full);
       setSel({ card: full, price });
@@ -323,7 +328,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                       </div>
                       <div style={{ fontSize: '10px', color: '#6e7681',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {card.set?.name || card.id.slice(0, card.id.lastIndexOf('-'))} · #{card.localId || card.number}
+                        {card._lang === 'ja' ? '🇯🇵 ' : ''}{card.set?.name || card.id.slice(0, card.id.lastIndexOf('-'))} · #{card.localId || card.number}
                       </div>
                       <div style={{ fontSize: '10px', color: '#484f58' }}>Tap to confirm →</div>
                     </div>

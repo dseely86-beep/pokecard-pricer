@@ -335,10 +335,29 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                   cursor: ocrBusy || loading ? 'default' : 'pointer',
                 }}
               >{ocrBusy ? '⟳' : '📷'}</button>
+              <button
+                title="Search by image on Google Lens"
+                onClick={async () => {
+                  try {
+                    const blob = await fetch(cellImg).then(r => r.blob());
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })]);
+                    window.open('https://lens.google.com/', '_blank');
+                    setError('Image copied! Paste it into Google Lens 📋');
+                  } catch {
+                    window.open('https://lens.google.com/', '_blank');
+                    setError('Upload your card photo to Google Lens');
+                  }
+                }}
+                style={{
+                  padding: '8px 9px', borderRadius: '6px', border: 'none',
+                  background: '#21262d', fontSize: '14px', flexShrink: 0,
+                  color: '#8b949e', cursor: 'pointer',
+                }}
+              >🔍</button>
             </div>
 
             {error && !open && (
-              <div style={{ fontSize: '11px', color: '#f85149', marginTop: '4px' }}>{error}</div>
+              <div style={{ fontSize: '11px', color: error.includes('copied') ? '#4fc3f7' : '#f85149', marginTop: '4px' }}>{error}</div>
             )}
 
             {open && results.length > 0 && (
@@ -919,71 +938,7 @@ function CollectionScreen({ collection, onBack, onDelete, onScan, onPriceEdit })
             display: 'flex', alignItems: 'center', gap: '10px',
             padding: '11px', background: '#161b22', borderRadius: '12px',
             marginBottom: '7px', border: '1px solid #30363d',
-          }}>
-            {/* Rank */}
-            <div style={{
-              width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0,
-              background: idx === 0 ? '#ffd700' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#cd7f32' : '#21262d',
-              color: idx < 3 ? '#0d1117' : '#6e7681',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '10px', fontWeight: 800,
-            }}>{idx + 1}</div>
-
-            {/* Card image */}
-            {card.image
-              ? <img src={card.image} alt="" style={{
-                  width: '44px', height: '62px', objectFit: 'cover',
-                  borderRadius: '4px', flexShrink: 0,
-                }} />
-              : <div style={{
-                  width: '44px', height: '62px', background: '#21262d',
-                  borderRadius: '4px', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px',
-                }}>⚪</div>
-            }
-
-            {/* Name + set */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: '13px', fontWeight: 600, color: '#e6edf3',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>{card.name}</div>
-              <div style={{
-                fontSize: '10px', color: '#6e7681',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>{card.set}{card.number ? ` · #${card.number}` : ''}</div>
-              <div style={{ fontSize: '10px', color: '#484f58' }}>
-                {new Date(card.scannedAt).toLocaleDateString()}
-              </div>
-            </div>
-
-            {/* Price — tap to edit */}
-            {editPriceId === card.id ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                <span style={{ fontSize: '12px', color: '#6e7681' }}>$</span>
-                <input
-                  autoFocus
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editPriceVal}
-                  onChange={e => setEditPriceVal(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      const p = parseFloat(editPriceVal);
-                      onPriceEdit(card.id, isNaN(p) ? null : p);
-                      setEditPriceId(null);
-                    }
-                    if (e.key === 'Escape') setEditPriceId(null);
-                  }}
-                  style={{
-                    width: '72px', padding: '3px 5px', fontSize: '13px', fontWeight: 700,
-                    background: '#0d1117', border: '1px solid #58a6ff',
-                    borderRadius: '5px', color: '#e6edf3', textAlign: 'right',
-                  }}
-                />
-                <button
-                  onClick={() => {
+          }}>\n            {/* Rank */}\n            <div style={{\n              width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0,\n              background: idx === 0 ? '#ffd700' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#cd7f32' : '#21262d',\n              color: idx < 3 ? '#0d1117' : '#6e7681',\n              display: 'flex', alignItems: 'center', justifyContent: 'center',\n              fontSize: '10px', fontWeight: 800,\n            }}>{idx + 1}</div>\n\n            {/* Card image */}\n            {card.image\n              ? <img src={card.image} alt=\"\" style={{\n                  width: '44px', height: '62px', objectFit: 'cover',\n                  borderRadius: '4px', flexShrink: 0,\n                }} />\n              : <div style={{\n                  width: '44px', height: '62px', background: '#21262d',\n                  borderRadius: '4px', flexShrink: 0,\n                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px',\n                }}>\u26aa</div>\n            }\n\n            {/* Name + set */}\n            <div style={{ flex: 1, minWidth: 0 }}>\n              <div style={{\n                fontSize: '13px', fontWeight: 600, color: '#e6edf3',\n                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',\n              }}>{card.name}</div>\n              <div style={{\n                fontSize: '10px', color: '#6e7681',\n                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',\n              }}>{card.set}{card.number ? ` \u00b7 #${card.number}` : ''}</div>\n              <div style={{ fontSize: '10px', color: '#484f58' }}>\n                {new Date(card.scannedAt).toLocaleDateString()}\n              </div>\n            </div>\n\n            {/* Price \u2014 tap to edit */}\n            {editPriceId === card.id ? (\n              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>\n                <span style={{ fontSize: '12px', color: '#6e7681' }}>$</span>\n                <input\n                  autoFocus\n                  type=\"number\"\n                  min=\"0\"\n                  step=\"0.01\"\n                  value={editPriceVal}\n                  onChange={e => setEditPriceVal(e.target.value)}\n                  onKeyDown={e => {\n                    if (e.key === 'Enter') {\n                      const p = parseFloat(editPriceVal);\n                      onPriceEdit(card.id, isNaN(p) ? null : p);\n                      setEditPriceId(null);\n                    }\n                    if (e.key === 'Escape') setEditPriceId(null);\n                  }}\n                  style={{\n                    width: '72px', padding: '3px 5px', fontSize: '13px', fontWeight: 700,\n                    background: '#0d1117', border: '1px solid #58a6ff',\n                    borderRadius: '5px', color: '#e6edf3', textAlign: 'right',\n                  }}\n                />\n                <button\n                  onClick={() => {
                     const p = parseFloat(editPriceVal);
                     onPriceEdit(card.id, isNaN(p) ? null : p);
                     setEditPriceId(null);

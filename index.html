@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0d1117" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>PokÃ©Card Pricer</title>
+  <title>PokéCard Pricer</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -42,9 +42,9 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    UTILITIES
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 async function splitImage(src, rows, cols) {
   return new Promise((res, rej) => {
@@ -106,7 +106,7 @@ async function searchCards(query) {
 
 async function ocrCardName(imgSrc) {
   try {
-    // Crop top ~22% of the image â that's where the name lives on most cards
+    // Crop top ~22% of the image — that's where the name lives on most cards
     const img = await new Promise((res, rej) => {
       const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = imgSrc;
     });
@@ -119,7 +119,7 @@ async function ocrCardName(imgSrc) {
     const raw = result.data.text || '';
     // Clean up: remove non-name characters, pick the best candidate line
     const lines = raw.split('\n')
-      .map(l => l.replace(/[^a-zA-Z\s'\-.Ã©Ã]/g, ' ').trim())
+      .map(l => l.replace(/[^a-zA-Z\s'\-.éÉ]/g, ' ').trim())
       .filter(l => l.length >= 2);
     const name = lines.find(l => /[a-zA-Z]{2,}/.test(l) && !/^hp$/i.test(l.trim())) || lines[0] || '';
     return name.replace(/\s+/g, ' ').trim();
@@ -142,7 +142,7 @@ function getPrice(card) {
         if (tp[v]?.market != null) return tp[v].market;
       }
     }
-    // Cardmarket EUR (fallback â close enough for ballpark)
+    // Cardmarket EUR (fallback — close enough for ballpark)
     if (p.cardmarket?.avg != null)   return p.cardmarket.avg;
     if (p.cardmarket?.trend != null) return p.cardmarket.trend;
   }
@@ -158,7 +158,7 @@ function getPrice(card) {
 
 const $p = p => p != null
   ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p)
-  : 'â';
+  : '—';
 
 const $c = p => {
   if (p == null) return '#6e7681';
@@ -172,9 +172,9 @@ const STORE = 'pokepricer_v2';
 const loadColl = () => { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch { return []; } };
 const saveColl = c => { try { localStorage.setItem(STORE, JSON.stringify(c)); } catch {} };
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    CARD IDENTIFIER (one row per cell)
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 // Cache search results so the same name never hits the API twice
 const _searchCache = new Map();
@@ -199,7 +199,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
     if (_searchCache.has(key)) {
       const cached = _searchCache.get(key);
       setRes(cached); setOpen(cached.length > 0);
-      if (cached.length === 0) setError('No cards found â try a different spelling');
+      if (cached.length === 0) setError('No cards found — try a different spelling');
       return;
     }
     setLoad(true);
@@ -207,7 +207,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
     setLoad(false);
     _searchCache.set(key, r);
     setRes(r); setOpen(r.length > 0);
-    if (r.length === 0) setError('No cards found â try a different spelling');
+    if (r.length === 0) setError('No cards found — try a different spelling');
   };
 
   useEffect(() => {
@@ -265,7 +265,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
       {/* Right side */}
       <div style={{ flex: 1, minWidth: 0 }} ref={ref}>
         {selected ? (
-          /* ââ Confirmed card ââ */
+          /* ── Confirmed card ── */
           <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
             {selected.card.image && (
               <img src={selected.card.image + '/high.webp'} alt="" style={{
@@ -289,10 +289,10 @@ function CardIdentifier({ index, cellImg, onSelect }) {
             <button onClick={clear} style={{
               background: 'none', border: 'none', color: '#6e7681',
               cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: 0, flexShrink: 0,
-            }}>â</button>
+            }}>✕</button>
           </div>
         ) : (
-          /* ââ Search box ââ */
+          /* ── Search box ── */
           <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', gap: '6px' }}>
               <input
@@ -300,7 +300,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                 onChange={e => { setQ(e.target.value); setError(''); }}
                 onKeyDown={e => e.key === 'Enter' && doSearch(q)}
                 onFocus={() => results.length > 0 && setOpen(true)}
-                placeholder="PokÃ©mon nameâ¦"
+                placeholder="Pokémon name…"
                 style={{
                   flex: 1, padding: '8px 9px', minWidth: 0,
                   background: '#0d1117', border: '1px solid #30363d',
@@ -317,7 +317,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                   fontSize: '12px', fontWeight: 700, cursor: loading || ocrBusy || q.trim().length < 2 ? 'default' : 'pointer',
                   flexShrink: 0, whiteSpace: 'nowrap',
                 }}
-              >{loading ? 'â³' : 'Search'}</button>
+              >{loading ? '⟳' : 'Search'}</button>
               <button
                 title="Auto-read card name"
                 disabled={ocrBusy || loading}
@@ -326,7 +326,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                   const name = await ocrCardName(cellImg);
                   setOcrBusy(false);
                   if (name && name.length >= 2) { setQ(name); doSearch(name); }
-                  else setError("Couldn't read â try typing the name");
+                  else setError("Couldn't read — try typing the name");
                 }}
                 style={{
                   padding: '8px 9px', borderRadius: '6px', border: 'none',
@@ -334,7 +334,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                   color: ocrBusy ? '#484f58' : '#8b949e',
                   cursor: ocrBusy || loading ? 'default' : 'pointer',
                 }}
-              >{ocrBusy ? 'â³' : 'ð·'}</button>
+              >{ocrBusy ? '⟳' : '📷'}</button>
               <button
                 title="Search by image on Google Lens"
                 onClick={async () => {
@@ -342,7 +342,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                     const blob = await fetch(cellImg).then(r => r.blob());
                     await navigator.clipboard.write([new ClipboardItem({ 'image/jpeg': blob })]);
                     window.open('https://lens.google.com/', '_blank');
-                    setError('Image copied! Paste it into Google Lens ð');
+                    setError('Image copied! Paste it into Google Lens 📋');
                   } catch {
                     window.open('https://lens.google.com/', '_blank');
                     setError('Upload your card photo to Google Lens');
@@ -353,7 +353,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                   background: '#21262d', fontSize: '14px', flexShrink: 0,
                   color: '#8b949e', cursor: 'pointer',
                 }}
-              >ð</button>
+              >🔍</button>
             </div>
 
             {error && !open && (
@@ -388,9 +388,9 @@ function CardIdentifier({ index, cellImg, onSelect }) {
                       </div>
                       <div style={{ fontSize: '10px', color: '#6e7681',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {card._lang === 'ja' ? 'ð¯ðµ ' : ''}{card.set?.name || card.id.slice(0, card.id.lastIndexOf('-'))} Â· #{card.localId || card.number}
+                        {card._lang === 'ja' ? '🇯🇵 ' : ''}{card.set?.name || card.id.slice(0, card.id.lastIndexOf('-'))} · #{card.localId || card.number}
                       </div>
-                      <div style={{ fontSize: '10px', color: '#484f58' }}>Tap to confirm â</div>
+                      <div style={{ fontSize: '10px', color: '#484f58' }}>Tap to confirm →</div>
                     </div>
                   </div>
                 ))}
@@ -403,9 +403,9 @@ function CardIdentifier({ index, cellImg, onSelect }) {
   );
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    HOME SCREEN
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function HomeScreen({ collection, onScan, onView }) {
   const total = useMemo(() => collection.reduce((s, c) => s + (c.price || 0), 0), [collection]);
@@ -419,14 +419,14 @@ function HomeScreen({ collection, onScan, onView }) {
         <div style={{
           fontSize: '76px', lineHeight: 1, marginBottom: '12px',
           filter: 'drop-shadow(0 0 24px rgba(255,203,5,0.35))',
-        }}>â¡</div>
+        }}>⚡</div>
         <h1 style={{
           fontSize: '34px', fontWeight: 900, letterSpacing: '-0.5px',
           background: 'linear-gradient(135deg, #ffcb05 0%, #ff6b35 100%)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           backgroundClip: 'text', marginBottom: '8px',
-        }}>PokÃ©Card Pricer</h1>
-        <p style={{ color: '#6e7681', fontSize: '14px' }}>Scan Â· Identify Â· Track your collection</p>
+        }}>PokéCard Pricer</h1>
+        <p style={{ color: '#6e7681', fontSize: '14px' }}>Scan · Identify · Track your collection</p>
       </div>
 
       {/* Stats */}
@@ -457,7 +457,7 @@ function HomeScreen({ collection, onScan, onView }) {
               display: 'flex', alignItems: 'center', gap: '10px',
               background: '#0d1117', borderRadius: '10px', padding: '10px',
             }}>
-              <span style={{ fontSize: '16px' }}>ð</span>
+              <span style={{ fontSize: '16px' }}>👑</span>
               {top.image && (
                 <img src={top.image} alt="" style={{
                   width: '30px', height: '42px', objectFit: 'cover',
@@ -490,7 +490,7 @@ function HomeScreen({ collection, onScan, onView }) {
           color: '#0d1117', border: 'none', borderRadius: '14px', cursor: 'pointer',
           boxShadow: '0 4px 22px rgba(255,203,5,0.28)',
         }}>
-          ð· Scan Cards
+          📷 Scan Cards
         </button>
         {collection.length > 0 && (
           <button onClick={onView} style={{
@@ -498,7 +498,7 @@ function HomeScreen({ collection, onScan, onView }) {
             background: '#21262d', color: '#e6edf3',
             border: '1px solid #30363d', borderRadius: '14px', cursor: 'pointer',
           }}>
-            ð¦ View Collection ({collection.length})
+            📦 View Collection ({collection.length})
           </button>
         )}
       </div>
@@ -507,15 +507,15 @@ function HomeScreen({ collection, onScan, onView }) {
         textAlign: 'center', fontSize: '11px', color: '#484f58',
         marginTop: 'auto', paddingTop: '32px',
       }}>
-        Prices via TCGdex Â· USD/EUR Â· May vary from actual market
+        Prices via TCGdex · USD/EUR · May vary from actual market
       </p>
     </div>
   );
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    SCAN SCREEN
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function Stepper({ label, value, min, max, onChange }) {
   return (
@@ -529,7 +529,7 @@ function Stepper({ label, value, min, max, onChange }) {
             width: '32px', height: '32px', borderRadius: '8px 0 0 8px',
             background: '#21262d', border: '1px solid #30363d', color: value <= min ? '#484f58' : '#e6edf3',
             fontSize: '18px', cursor: value <= min ? 'default' : 'pointer', lineHeight: 1,
-          }}>â</button>
+          }}>−</button>
         <div style={{
           width: '38px', height: '32px', background: '#0d1117',
           border: '1px solid #30363d', borderLeft: 'none', borderRight: 'none',
@@ -564,7 +564,7 @@ function ScanScreen({ onBack, onCellsReady }) {
   const isMobile = typeof window !== 'undefined' &&
     ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
-  /* ââ webcam ââ */
+  /* ── webcam ── */
   const startWebcam = async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
@@ -595,7 +595,7 @@ function ScanScreen({ onBack, onCellsReady }) {
 
   useEffect(() => () => { if (stream) stream.getTracks().forEach(t => t.stop()); }, [stream]);
 
-  /* ââ file / drag ââ */
+  /* ── file / drag ── */
   const loadFile = f => {
     if (!f || !f.type.startsWith('image/')) return;
     const r = new FileReader();
@@ -620,14 +620,14 @@ function ScanScreen({ onBack, onCellsReady }) {
     }
   };
 
-  /* ââ webcam view ââ */
+  /* ── webcam view ── */
   if (webcamOn) return (
     <div style={{ padding: '16px', minHeight: '100vh' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
         <button onClick={stopWebcam} style={{
           background: 'none', border: 'none', color: '#58a6ff',
           fontSize: '15px', cursor: 'pointer', padding: '4px 0',
-        }}>â Back</button>
+        }}>← Back</button>
         <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Camera</h2>
       </div>
       <div style={{
@@ -643,25 +643,25 @@ function ScanScreen({ onBack, onCellsReady }) {
         }} />
       </div>
       <p style={{ fontSize: '12px', color: '#6e7681', textAlign: 'center', marginBottom: '14px' }}>
-        Frame all {totalCards} card{totalCards !== 1 ? 's' : ''} ({rows}Ã{cols}) in the viewfinder, then tap capture
+        Frame all {totalCards} card{totalCards !== 1 ? 's' : ''} ({rows}×{cols}) in the viewfinder, then tap capture
       </p>
       <button onClick={captureFrame} style={{
         width: '100%', padding: '16px', fontSize: '16px', fontWeight: 700,
         background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
         color: '#0d1117', border: 'none', borderRadius: '14px', cursor: 'pointer',
         boxShadow: '0 4px 22px rgba(255,203,5,0.28)',
-      }}>ð¸ Capture Photo</button>
+      }}>📸 Capture Photo</button>
     </div>
   );
 
-  /* ââ main view ââ */
+  /* ── main view ── */
   return (
     <div style={{ padding: '16px', minHeight: '100vh' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
         <button onClick={onBack} style={{
           background: 'none', border: 'none', color: '#58a6ff',
           fontSize: '15px', cursor: 'pointer', padding: '4px 0',
-        }}>â Back</button>
+        }}>← Back</button>
         <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Scan Cards</h2>
       </div>
 
@@ -675,7 +675,7 @@ function ScanScreen({ onBack, onCellsReady }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px' }}>
           <Stepper label="Rows" value={rows} min={1} max={8} onChange={setRows} />
-          <div style={{ fontSize: '22px', color: '#30363d', marginTop: '18px' }}>Ã</div>
+          <div style={{ fontSize: '22px', color: '#30363d', marginTop: '18px' }}>×</div>
           <Stepper label="Cols" value={cols} min={1} max={8} onChange={setCols} />
           <div style={{ marginTop: '18px', textAlign: 'center' }}>
             <div style={{ fontSize: '24px', fontWeight: 900, color: '#ffcb05', lineHeight: 1 }}>{totalCards}</div>
@@ -690,9 +690,9 @@ function ScanScreen({ onBack, onCellsReady }) {
         borderRadius: '10px', padding: '12px', marginBottom: '14px',
         fontSize: '12px', color: '#8b949e', lineHeight: 1.6,
       }}>
-        <strong style={{ color: '#e6edf3' }}>ð¸ For best results: </strong>
+        <strong style={{ color: '#e6edf3' }}>📸 For best results: </strong>
         Lay {totalCards} card{totalCards !== 1 ? 's' : ''} in a{' '}
-        <strong style={{color:'#e6edf3'}}>{rows}Ã{cols} grid</strong> on a flat surface.
+        <strong style={{color:'#e6edf3'}}>{rows}×{cols} grid</strong> on a flat surface.
         Use good lighting, avoid glare, and fill the frame.
       </div>
 
@@ -714,7 +714,7 @@ function ScanScreen({ onBack, onCellsReady }) {
           }}
         >
           <div style={{ textAlign: 'center', padding: '28px', color: '#6e7681' }}>
-            <div style={{ fontSize: '44px', marginBottom: '8px' }}>ð</div>
+            <div style={{ fontSize: '44px', marginBottom: '8px' }}>📁</div>
             <div style={{ fontSize: '15px', fontWeight: 600, color: '#e6edf3', marginBottom: '4px' }}>
               {isMobile ? 'Tap to choose photo' : 'Click or drag & drop image'}
             </div>
@@ -748,7 +748,7 @@ function ScanScreen({ onBack, onCellsReady }) {
             background: '#21262d', color: '#e6edf3',
             border: '1px solid #30363d', borderRadius: '12px', cursor: 'pointer',
           }}>
-            ð¼ï¸ {isMobile ? 'Photo Library' : 'Upload File'}
+            🖼️ {isMobile ? 'Photo Library' : 'Upload File'}
           </button>
           <button onClick={startWebcam} style={{
             flex: 1, padding: '13px', fontSize: '14px', fontWeight: 600,
@@ -756,7 +756,7 @@ function ScanScreen({ onBack, onCellsReady }) {
             color: '#0d1117', border: 'none', borderRadius: '12px', cursor: 'pointer',
             boxShadow: '0 4px 16px rgba(255,203,5,0.22)',
           }}>
-            ð· {isMobile ? 'Camera' : 'Use Webcam'}
+            📷 {isMobile ? 'Camera' : 'Use Webcam'}
           </button>
         </div>
       )}
@@ -776,16 +776,16 @@ function ScanScreen({ onBack, onCellsReady }) {
           border: 'none', borderRadius: '14px',
           cursor: busy ? 'default' : 'pointer',
         }}>
-          {busy ? 'â³ Processingâ¦' : `Process ${totalCards} Card${totalCards !== 1 ? 's' : ''} â`}
+          {busy ? '⟳ Processing…' : `Process ${totalCards} Card${totalCards !== 1 ? 's' : ''} →`}
         </button>
       )}
     </div>
   );
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ═══════════════════════════════════════════════
    IDENTIFY SCREEN
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function IdentifyScreen({ cells, onBack, onAdd }) {
   const [idents, setIdents] = useState(() => Array(cells.length).fill(null));
@@ -806,36 +806,245 @@ function IdentifyScreen({ cells, onBack, onAdd }) {
       number:    d.card.localId || d.card.number || '',
       image:     d.card.image ? d.card.image + '/high.webp' : null,
       price:     d.price,
-      yÍ¹¹Ðè¹ÜÑ ¤¹Ñ½%M=MÑÉ¥¹ ¤°(ô¤¤¤ì(ôì((ÉÑÕÉ¸ (ñ¥ØÍÑå±õíìÁ¥¹èÄÙÁà°Á¥¹	½ÑÑ½´è½¹¥Éµ¹±¹Ñ øÀüÄÀÁÁàèÄÙÁàõôø(ñ¥ØÍÑå±õíì¥ÍÁ±äè±à°±¥¹%ÑµÌè¹ÑÈ°ÀèÄÉÁà°µÉ¥¹	½ÑÑ½´èÄÙÁàõôø(ñÕÑÑ½¸½¹
-±¥¬õí½¹	­ôÍÑå±õíì(­É½Õ¹è¹½¹°½ÉÈè¹½¹°½±½ÈèÔáÙ°(½¹ÑM¥éèÄÕÁà°ÕÉÍ½ÈèÁ½¥¹ÑÈ°Á¥¹èÑÁàÀ°(õôû@	¬ð½ÕÑÑ½¸ø(ñ ÈÍÑå±õíì½¹ÑM¥éèÈÁÁà°½¹Ñ]¥¡ÐèÜÀÀõôù%¹Ñ¥ä
-ÉÌð½ Èø(ñ¥ØÍÑå±õíì(µÉ¥¹1ÐèÕÑ¼°­É½Õ¹èÈÄÈØÉ°(½ÉÉI¥ÕÌèÈÁÁà°Á¥¹èÍÁàÄÁÁà°(½¹ÑM¥éèÄÅÁà°½±½ÈèáäÐå°(õôùí½¹¥Éµ¹±¹Ñ¡ô½í±±Ì¹±¹Ñ¡ôð½¥Øø(ð½¥Øø((ñÀÍÑå±õíì½¹ÑM¥éèÄÍÁà°½±½ÈèÙÜØàÄ°µÉ¥¹	½ÑÑ½´èÄÑÁàõôø(QåÁÑ¡A½¯¥µ½¸¹µÍ¡½Ý¸½¸ É¸A¥¬Ñ¡½ÉÉÐÙÉÍ¥½¸É½´Ñ¡É½Á½Ý¸Ñ¼½¹¥É´¸(ð½Àø((í±±Ì¹µÀ ¡±°°¤¤ôø (ñ
-É%¹Ñ¥¥È(­äõí¥ô(¥¹àõí¥ô(±±%µõí±±ô(½¹M±Ðõíôø¡¹±M±Ð¡¤°¥ô(¼ø(¤¥ô((ì¼¨MÑ¥­äÈ¨½ô(í½¹¥Éµ¹±¹Ñ øÀ (ñ¥ØÍÑå±õíì(Á½Í¥Ñ¥½¸è¥á°½ÑÑ½´èÀ°±ÐèÔÀ°ÑÉ¹Í½É´èÑÉ¹Í±Ñ` ´ÔÀ¤°(Ý¥Ñ èÄÀÀ°µá]¥Ñ èÐàÁÁà°(Á¥¹èÄÉÁàÄÙÁà°­É½Õ¹èÄØÅÈÈ°(½ÉÉQ½ÀèÅÁàÍ½±¥ÌÀÌØÍ°(¥ÍÁ±äè±à°±¥¹%ÑµÌè¹ÑÈ°ÀèÄÉÁà°(½áM¡½ÜèÀ´ÑÁàÈÁÁàÉ À°À°À°À¸Ð¤°(õôø(ñ¥ØÍÑå±õíì±àèÄõôø(ñ¥ØÍÑå±õíì½¹ÑM¥éèÄÍÁà°½¹Ñ]¥¡ÐèØÀÀ°½±½ÈèÙÌõôø(í½¹¥Éµ¹±¹Ñ¡ôÉí½¹¥Éµ¹±¹Ñ ôôÄüÌèô¥¹Ñ¥¥(ð½¥Øø(ñ¥ØÍÑå±õíì½¹ÑM¥éèÄÉÁà°½±½ÈèÑÍÜõôùM¸Ñ½Ñ°èìÀ¡Ñ½Ñ°¥ôð½¥Øø(ð½¥Øø(ñÕÑÑ½¸½¹
-±¥¬õí¡¹±ôÍÑå±õíì(Á¥¹èÄÉÁàÄáÁà°½¹ÑM¥éèÄÑÁà°½¹Ñ]¥¡ÐèÜÀÀ°(­É½Õ¹è±¥¹ÈµÉ¥¹Ð ÄÌÕ°ÀÔ°åÀÀ¤°(½±½ÈèÁÄÄÄÜ°½ÉÈè¹½¹°½ÉÉI¥ÕÌèÄÁÁà°(ÕÉÍ½ÈèÁ½¥¹ÑÈ°±áM¡É¥¹¬èÀ°(õôø(Ñ¼
-½±±Ñ¥½¸H(ð½ÕÑÑ½¸ø(ð½¥Øø(¥ô(ð½¥Øø(¤ì)ô((¼¨VCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCV@(
-=11
-Q%=8M
-I8+VCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCV@¨¼()Õ¹Ñ¥½¸
-½±±Ñ¥½¹MÉ¸¡ì½±±Ñ¥½¸°½¹	¬°½¹±Ñ°½¹M¸°½¹AÉ¥¥Ðô¤ì(½¹ÍÐm½¹¥Éµ%°ÍÑ
-½¹¥Éµ%tôÕÍMÑÑ¡¹Õ±°¤ì(½¹ÍÐm¥ÑAÉ¥%°ÍÑ¥ÑAÉ¥%tôÕÍMÑÑ¡¹Õ±°¤ì(½¹ÍÐm¥ÑAÉ¥Y°°ÍÑ¥ÑAÉ¥Y±tôÕÍMÑÑ ¤ì((½¹ÍÐÍ½ÉÑôÕÍ5µ¼ ( ¤ôøl¸¸¹½±±Ñ¥½¹t¹Í½ÉÐ ¡°¤ôø¡¹ÁÉ¥ñðÀ¤´¡¹ÁÉ¥ñðÀ¤¤°(m½±±Ñ¥½¹t(¤ì(½¹ÍÐÑ½Ñ°ôÕÍ5µ¼  ¤ôø½±±Ñ¥½¸¹ÉÕ ¡Ì°¤ôøÌ¬¡¹ÁÉ¥ñðÀ¤°À¤°m½±±Ñ¥½¹t¤ì(½¹ÍÐÙô½±±Ñ¥½¸¹±¹Ñ øÀüÑ½Ñ°¼½±±Ñ¥½¸¹±¹Ñ èÀì((½¹ÍÐ¡¹±±Ñô¥ôøì(¥¡½¹¥Éµ%ôôô¥¤ì½¹±Ñ¡¥¤ìÍÑ
-½¹¥Éµ%¡¹Õ±°¤ìô(±ÍÍÑ
-½¹¥Éµ%¡¥¤ì(ôì((ÉÑÕÉ¸ (ñ¥ØÍÑå±õíìÁ¥¹èÄÙÁà°Á¥¹	½ÑÑ½´èäÁÁàõôø(ñ¥ØÍÑå±õíì¥ÍÁ±äè±à°±¥¹%ÑµÌè¹ÑÈ°ÀèÄÉÁà°µÉ¥¹	½ÑÑ½´èÈÁÁàõôø(ñÕÑÑ½¸½¹
-±¥¬õí½¹	­ôÍÑå±õíì(­É½Õ¹è¹½¹°½ÉÈè¹½¹°½±½ÈèÔáÙ°(½¹ÑM¥éèÄÕÁà°ÕÉÍ½ÈèÁ½¥¹ÑÈ°Á¥¹èÑÁàÀ°(õôû@	¬ð½ÕÑÑ½¸ø(ñ ÈÍÑå±õíì½¹ÑM¥éèÈÁÁà°½¹Ñ]¥¡ÐèÜÀÀõôù5ä
-½±±Ñ¥½¸ð½ Èø(ð½¥Øø((ì¼¨MÑÑÌÈ¨½ô(ñ¥ØÍÑå±õíì(¥ÍÁ±äè±à°­É½Õ¹èÄØÅÈÈ°½ÉÉI¥ÕÌèÄÑÁà°(Á¥¹èÄÙÁà°µÉ¥¹	½ÑÑ½´èÈÁÁà°½ÉÈèÅÁàÍ½±¥ÌÀÌØÍ°(õôø(íl(ì±°è
-ÉÌ°Ù±Õè½±±Ñ¥½¸¹±¹Ñ °½±½ÈèÀÔô°(ì±°èQ½Ñ°Y±Õ°Ù±ÕèÀ¡Ñ½Ñ°¤°½±½ÈèÑÍÜô°(ì±°èÙ¼
-É°Ù±ÕèÀ¡Ù¤°½±½ÈèàÅÜàÐô°(t¹µÀ ¡Ì°¤¤ôø (ñIÐ¹Éµ¹Ð­äõíÌ¹±±ôø(í¤øÀñ¥ØÍÑå±õíìÝ¥Ñ èÅÁà°­É½Õ¹èÌÀÌØÍ°µÉ¥¸èÀÑÁàõô¼ùô(ñ¥ØÍÑå±õíì±àèÄ°ÑáÑ±¥¸è¹ÑÈõôø(ñ¥ØÍÑå±õíì½¹ÑM¥éèÄáÁà°½¹Ñ]¥¡ÐèàÀÀ°½±½ÈèÌ¹½±½È°±¥¹!¥¡ÐèÄõôùíÌ¹Ù±Õôð½¥Øø(ñ¥ØÍÑå±õíì½¹ÑM¥éèÄÁÁà°½±½ÈèÙÜØàÄ°µÉ¥¹Q½ÀèÍÁàõôùíÌ¹±±ôð½¥Øø(ð½¥Øø(ð½IÐ¹Éµ¹Ðø(¤¥ô(ð½¥Øø((ì¼¨µÁÑäÍÑÑ¨½ô(íÍ½ÉÑ¹±¹Ñ ôôôÀü (ñ¥ØÍÑå±õíìÑáÑ±¥¸è¹ÑÈ°Á¥¹èØÁÁàÈÁÁà°½±½ÈèÙÜØàÄõôø(ñ¥ØÍÑå±õíì½¹ÑM¥éèÔÙÁà°µÉ¥¹	½ÑÑ½´èÄÉÁàõôûÂ~N´ð½¥Øø(ñ¥ØÍÑå±õíì½¹Ñ]¥¡ÐèØÀÀ°½±½ÈèÙÌ°µÉ¥¹	½ÑÑ½´èÙÁàõôù9¼ÉÌåÐð½¥Øø(ñ¥ØÍÑå±õíì½¹ÑM¥éèÄÍÁà°µÉ¥¹	½ÑÑ½´èÈÁÁàõôùM¸¹ä¹ÕµÈ½ÉÌÑ¼ÐÍÑÉÑð½¥Øø(ñÕÑÑ½¸½¹
-±¥¬õí½¹M¹ôÍÑå±õíì(Á¥¹èÄÉÁàÈÑÁà°½¹ÑM¥éèÄÑÁà°½¹Ñ]¥¡ÐèÜÀÀ°(­É½Õ¹è±¥¹ÈµÉ¥¹Ð ÄÌÕ°ÀÔ°åÀÀ¤°(½±½ÈèÁÄÄÄÜ°½ÉÈè¹½¹°½ÉÉI¥ÕÌèÄÁÁà°ÕÉÍ½ÈèÁ½¥¹ÑÈ°(õôûÂ~NÜM¸
-ÉÌð½ÕÑÑ½¸ø(ð½¥Øø(¤è (¼¨
-É±¥ÍÐÍ½ÉÑäÁÉ¥¨¼(Í½ÉÑ¹µÀ ¡É°¥à¤ôø (ñ¥Ø­äõíÉ¹¥ô±ÍÍ9µôÍÑå±õíì(¥ÍÁ±äè±à°±¥¹%ÑµÌè¹ÑÈ°ÀèÄÁÁà°(Á¥¹èÄÅÁà°­É½Õ¹èÄØÅÈÈ°½ÉÉI¥ÕÌèÄÉÁà°(µÉ¥¹	½ÑÑ½´èÝÁà°½ÉÈèÅÁàÍ½±¥ÌÀÌØÍ°(õôø(ì¼¨I¹¬¨½ô(ñ¥ØÍÑå±õíì(Ý¥Ñ èÈÙÁà°¡¥¡ÐèÈÙÁà°½ÉÉI¥ÕÌèÔÀ°±áM¡É¥¹¬èÀ°(­É½Õ¹è¥àôôôÀüÜÀÀè¥àôôôÄüÁÁÀè¥àôôôÈüÝÌÈèÈÄÈØÉ°(½±½Èè¥àðÌüÁÄÄÄÜèÙÜØàÄ°(¥ÍÁ±äè±à°±¥¹%ÑµÌè¹ÑÈ°©ÕÍÑ¥å
-½¹Ñ¹Ðè¹ÑÈ°(½¹ÑM¥éèÄÁÁà°½¹Ñ]¥¡ÐèàÀÀ°(õôùí¥à¬Åôð½¥Øø((ì¼¨
-É¥µ¨½ô(íÉ¹¥µ(üñ¥µÍÉõíÉ¹¥µô±ÐôÍÑå±õíì(Ý¥Ñ èÐÑÁà°¡¥¡ÐèØÉÁà°½©Ñ¥Ðè½ÙÈ°(½ÉÉI¥ÕÌèÑÁà°±áM¡É¥¹¬èÀ°(õô¼ø(èñ¥ØÍÑå±õíì(Ý¥Ñ èÐÑÁà°¡¥¡ÐèØÉÁà°­É½Õ¹èÈÄÈØÉ°(½ÉÉI¥ÕÌèÑÁà°±áM¡É¥¹¬èÀ°(¥ÍÁ±äè±à°±¥¹%ÑµÌè¹ÑÈ°©ÕÍÑ¥å
-½¹Ñ¹Ðè¹ÑÈ°½¹ÑM¥éèÈÁÁà°(õôûj¨ð½¥Øø(ô((ì¼¨9µ¬ÍÐ¨½ô(ñ¥ØÍÑå±õíì±àèÄ°µ¥¹]¥Ñ èÀõôø(ñ¥ØÍÑå±õíì(½¹ÑM¥éèÄÍÁà°½¹Ñ]¥¡ÐèØÀÀ°½±½ÈèÙÌ°(½ÙÉ±½Üè¡¥¸°ÑáÑ=ÙÉ±½Üè±±¥ÁÍ¥Ì°Ý¡¥ÑMÁè¹½ÝÉÀ°(õôùíÉ¹¹µôð½¥Øø(ñ¥ØÍÑå±õíì(½¹ÑM¥éèÄÁÁà°½±½ÈèÙÜØàÄ°(½ÙÉ±½Üè¡¥¸°ÑáÑ=ÙÉ±½Üè±±¥ÁÍ¥Ì°Ý¡¥ÑMÁè¹½ÝÉÀ°(õôùíÉ¹ÍÑõíÉ¹¹ÕµÈü
-ÜíÉ¹¹ÕµÉõèôð½¥Øø(ñ¥ØÍÑå±õíì½¹ÑM¥éèÄÁÁà°½±½ÈèÐàÑÔàõôø(í¹ÜÑ¡É¹Í¹¹Ð¤¹Ñ½1½±ÑMÑÉ¥¹ ¥ô(ð½¥Øø(ð½¥Øø((ì¼¨AÉ¥PÑÀÑ¼¥Ð¨½ô(í¥ÑAÉ¥%ôôôÉ¹¥ü (ñ¥ØÍÑå±õíì¥ÍÁ±äè±à°±¥¹%ÑµÌè¹ÑÈ°ÀèÑÁà°±áM¡É¥¹¬èÀõôø(ñÍÁ¸ÍÑå±õíì½¹ÑM¥éèÄÉÁà°½±½ÈèÙÜØàÄõôøð½ÍÁ¸ø(ñ¥¹ÁÕÐ(ÕÑ½½ÕÌ(ÑåÁô¹ÕµÈ(µ¥¸ôÀ(ÍÑÀôÀ¸ÀÄ(Ù±Õõí¥ÑAÉ¥Y±ô(½¹
-¡¹õíôøÍÑ¥ÑAÉ¥Y°¡¹ÑÉÐ¹Ù±Õ¥ô(½¹-å½Ý¸õíôøì(¥¡¹­äôôô¹ÑÈ¤ì(½¹ÍÐÀôÁÉÍ±½Ð¡¥ÑAÉ¥Y°¤ì(½¹AÉ¥¥Ð¡É¹¥°¥Í98¡À¤ü¹Õ±°èÀ¤ì(ÍÑ¥ÑAÉ¥%¡¹Õ±°¤ì(ô(¥¡¹­äôôôÍÁ¤ÍÑ¥ÑAÉ¥%¡¹Õ±°¤ì(õô(ÍÑå±õíì(Ý¥Ñ èÜÉÁà°Á¥¹èÍÁàÕÁà°½¹ÑM¥éèÄÍÁà°½¹Ñ]¥¡ÐèÜÀÀ°(­É½Õ¹èÁÄÄÄÜ°½ÉÈèÅÁàÍ½±¥ÔáÙ°(½ÉÉI¥ÕÌèÕÁà°½±½ÈèÙÌ°ÑáÑ±¥¸èÉ¥¡Ð°(õô(¼ø(ñÕÑÑ½¸(½¹
-±¥¬õì ¤ôøì(½¹ÍÐÀôÁÉÍ±½Ð¡¥ÑAÉ¥Y°¤ì(½¹AÉ¥¥Ð¡É¹¥°¥Í98¡À¤ü¹Õ±°èÀ¤ì(ÍÑ¥ÑAÉ¥%¡¹Õ±°¤ì(õô(ÍÑå±õíì(­É½Õ¹èÅÙ°½ÉÈè¹½¹°½ÉÉI¥ÕÌèÑÁà°(½±½Èè°½¹ÑM¥éèÄÅÁà°Á¥¹èÍÁàÙÁà°ÕÉÍ½ÈèÁ½¥¹ÑÈ°(õô(ûrLð½ÕÑÑ½¸ø(ð½¥Øø(¤è (ñ¥Ø(½¹
-±¥¬õì ¤ôøìÍÑ¥ÑAÉ¥%¡É¹¥¤ìÍÑ¥ÑAÉ¥Y°¡É¹ÁÉ¥ô¹Õ±°üÉ¹ÁÉ¥¹Ñ½¥á È¤è¤ìõô(Ñ¥Ñ±ôQÀÑ¼¥ÐÁÉ¥(ÍÑå±õíì½¹ÑM¥éèÄÑÁà°½¹Ñ]¥¡ÐèàÀÀ°½±½Èè¡É¹ÁÉ¥¤°±áM¡É¥¹¬èÀ°ÕÉÍ½ÈèÁ½¥¹ÑÈõô(ø(ìÀ¡É¹ÁÉ¥¥ô(ð½¥Øø(¥ô((ì¼¨±ÑÝ¥Ñ ½¹µÑÀ½¹¥É´¨½ô(ñÕÑÑ½¸(½¹
-±¥¬õì ¤ôø¡¹±±Ñ¡É¹¥¥ô(½¹	±ÕÈõì ¤ôøÍÑ
-½¹¥Éµ%¡¹Õ±°¥ô(ÍÑå±õíì(­É½Õ¹è½¹¥Éµ%ôôôÉ¹¥üàÔÄÐäè¹½¹°(½ÉÈè¹½¹°(½±½Èè½¹¥Éµ%ôôôÉ¹¥üèÐàÑÔà°(ÕÉÍ½ÈèÁ½¥¹ÑÈ°½¹ÑM¥éèÄÅÁà°(Á¥¹èÑÁàÙÁà°½ÉÉI¥ÕÌèÑÁà°±áM¡É¥¹¬èÀ°(½¹Ñ]¥¡Ðè½¹¥Éµ%ôôôÉ¹¥üÜÀÀèÐÀÀ°(ÑÉ¹Í¥Ñ¥½¸è±°À¸ÉÌ°(Ý¡¥ÑMÁè¹½ÝÉÀ°(õô(ùí½¹¥Éµ%ôôôÉ¹¥üMÕÉüèrTõð½ÕÑÑ½¸ø(ð½¥Øø(¤¤(¥ô((ì¼¨±½Ñ¥¹Í¸ÕÑÑ½¸¨½ô(í½±±Ñ¥½¸¹±¹Ñ øÀ (ñÕÑÑ½¸½¹
-±¥¬õí½¹M¸} style={{
+      scannedAt: new Date().toISOString(),
+    })));
+  };
+
+  return (
+    <div style={{ padding: '16px', paddingBottom: confirmed.length > 0 ? '100px' : '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+        <button onClick={onBack} style={{
+          background: 'none', border: 'none', color: '#58a6ff',
+          fontSize: '15px', cursor: 'pointer', padding: '4px 0',
+        }}>← Back</button>
+        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Identify Cards</h2>
+        <div style={{
+          marginLeft: 'auto', background: '#21262d',
+          borderRadius: '20px', padding: '3px 10px',
+          fontSize: '11px', color: '#8b949e',
+        }}>{confirmed.length}/{cells.length}</div>
+      </div>
+
+      <p style={{ fontSize: '13px', color: '#6e7681', marginBottom: '14px' }}>
+        Type the Pokémon name shown on each card. Pick the correct version from the dropdown to confirm.
+      </p>
+
+      {cells.map((cell, i) => (
+        <CardIdentifier
+          key={i}
+          index={i}
+          cellImg={cell}
+          onSelect={d => handleSelect(i, d)}
+        />
+      ))}
+
+      {/* Sticky add bar */}
+      {confirmed.length > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+          width: '100%', maxWidth: '480px',
+          padding: '12px 16px', background: '#161b22',
+          borderTop: '1px solid #30363d',
+          display: 'flex', alignItems: 'center', gap: '12px',
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.4)',
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#e6edf3' }}>
+              {confirmed.length} card{confirmed.length !== 1 ? 's' : ''} identified
+            </div>
+            <div style={{ fontSize: '12px', color: '#4fc3f7' }}>Scan total: {$p(total)}</div>
+          </div>
+          <button onClick={handleAdd} style={{
+            padding: '12px 18px', fontSize: '14px', fontWeight: 700,
+            background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
+            color: '#0d1117', border: 'none', borderRadius: '10px',
+            cursor: 'pointer', flexShrink: 0,
+          }}>
+            Add to Collection →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   COLLECTION SCREEN
+══════════════════════════════ */
+
+function CollectionScreen({ collection, onBack, onDelete, onScan, onPriceEdit }) {
+  const [confirmId, setConfirmId] = useState(null);
+  const [editPriceId, setEditPriceId] = useState(null);
+  const [editPriceVal, setEditPriceVal] = useState('');
+
+  const sorted = useMemo(
+    () => [...collection].sort((a, b) => (b.price || 0) - (a.price || 0)),
+    [collection]
+  );
+  const total = useMemo(() => collection.reduce((s, c) => s + (c.price || 0), 0), [collection]);
+  const avg   = collection.length > 0 ? total / collection.length : 0;
+
+  const handleDelete = id => {
+    if (confirmId === id) { onDelete(id); setConfirmId(null); }
+    else setConfirmId(id);
+  };
+
+  return (
+    <div style={{ padding: '16px', paddingBottom: '90px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+        <button onClick={onBack} style={{
+          background: 'none', border: 'none', color: '#58a6ff',
+          fontSize: '15px', cursor: 'pointer', padding: '4px 0',
+        }}>← Back</button>
+        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>My Collection</h2>
+      </div>
+
+      {/* Stats bar */}
+      <div style={{
+        display: 'flex', background: '#161b22', borderRadius: '14px',
+        padding: '16px', marginBottom: '20px', border: '1px solid #30363d',
+      }}>
+        {[
+          { label: 'Cards',       value: collection.length, color: '#ffcb05' },
+          { label: 'Total Value', value: $p(total),         color: '#4fc3f7' },
+          { label: 'Avg / Card',  value: $p(avg),           color: '#81c784' },
+        ].map((s, i) => (
+          <React.Fragment key={s.label}>
+            {i > 0 && <div style={{ width: '1px', background: '#30363d', margin: '0 4px' }} />}
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: '10px', color: '#6e7681', marginTop: '3px' }}>{s.label}</div>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Empty state */}
+      {sorted.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6e7681' }}>
+          <div style={{ fontSize: '56px', marginBottom: '12px' }}>📭</div>
+          <div style={{ fontWeight: 600, color: '#e6edf3', marginBottom: '6px' }}>No cards yet</div>
+          <div style={{ fontSize: '13px', marginBottom: '20px' }}>Scan any number of cards to get started!</div>
+          <button onClick={onScan} style={{
+            padding: '12px 24px', fontSize: '14px', fontWeight: 700,
+            background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
+            color: '#0d1117', border: 'none', borderRadius: '10px', cursor: 'pointer',
+          }}>📷 Scan Cards</button>
+        </div>
+      ) : (
+        /* Card list sorted by price */
+        sorted.map((card, idx) => (
+          <div key={card.id} className="fade" style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '11px', background: '#161b22', borderRadius: '12px',
+            marginBottom: '7px', border: '1px solid #30363d',
+          }}>
+            {/* Rank */}
+            <div style={{
+              width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0,
+              background: idx === 0 ? '#ffd700' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#cd7f32' : '#21262d',
+              color: idx < 3 ? '#0d1117' : '#6e7681',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '10px', fontWeight: 800,
+            }}>{idx + 1}</div>
+
+            {/* Card image */}
+            {card.image
+              ? <img src={card.image} alt="" style={{
+                  width: '44px', height: '62px', objectFit: 'cover',
+                  borderRadius: '4px', flexShrink: 0,
+                }} />
+              : <div style={{
+                  width: '44px', height: '62px', background: '#21262d',
+                  borderRadius: '4px', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px',
+                }}>⚪</div>
+            }
+
+            {/* Name + set */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: '13px', fontWeight: 600, color: '#e6edf3',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{card.name}</div>
+              <div style={{
+                fontSize: '10px', color: '#6e7681',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{card.set}{card.number ? ` · #${card.number}` : ''}</div>
+              <div style={{ fontSize: '10px', color: '#484f58' }}>
+                {new Date(card.scannedAt).toLocaleDateString()}
+              </div>
+            </div>
+
+            {/* Price — tap to edit */}
+            {editPriceId === card.id ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                <span style={{ fontSize: '12px', color: '#6e7681' }}>$</span>
+                <input
+                  autoFocus
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editPriceVal}
+                  onChange={e => setEditPriceVal(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const p = parseFloat(editPriceVal);
+                      onPriceEdit(card.id, isNaN(p) ? null : p);
+                      setEditPriceId(null);
+                    }
+                    if (e.key === 'Escape') setEditPriceId(null);
+                  }}
+                  style={{
+                    width: '72px', padding: '3px 5px', fontSize: '13px', fontWeight: 700,
+                    background: '#0d1117', border: '1px solid #58a6ff',
+                    borderRadius: '5px', color: '#e6edf3', textAlign: 'right',
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    const p = parseFloat(editPriceVal);
+                    onPriceEdit(card.id, isNaN(p) ? null : p);
+                    setEditPriceId(null);
+                  }}
+                  style={{
+                    background: '#1f6feb', border: 'none', borderRadius: '4px',
+                    color: '#fff', fontSize: '11px', padding: '3px 6px', cursor: 'pointer',
+                  }}
+                >✓</button>
+              </div>
+            ) : (
+              <div
+                onClick={() => { setEditPriceId(card.id); setEditPriceVal(card.price != null ? card.price.toFixed(2) : ''); }}
+                title="Tap to edit price"
+                style={{ fontSize: '14px', fontWeight: 800, color: $c(card.price), flexShrink: 0, cursor: 'pointer' }}
+              >
+                {$p(card.price)}
+              </div>
+            )}
+
+            {/* Delete with one-tap confirm */}
+            <button
+              onClick={() => handleDelete(card.id)}
+              onBlur={() => setConfirmId(null)}
+              style={{
+                background: confirmId === card.id ? '#f85149' : 'none',
+                border: 'none',
+                color: confirmId === card.id ? '#fff' : '#484f58',
+                cursor: 'pointer', fontSize: '11px',
+                padding: '4px 6px', borderRadius: '4px', flexShrink: 0,
+                fontWeight: confirmId === card.id ? 700 : 400,
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+              }}
+            >{confirmId === card.id ? 'Sure?' : '✕'}</button>
+          </div>
+        ))
+      )}
+
+      {/* Floating scan button */}
+      {collection.length > 0 && (
+        <button onClick={onScan} style={{
           position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
           padding: '13px 30px', fontSize: '14px', fontWeight: 700,
           background: 'linear-gradient(135deg, #ffcb05, #ff9d00)',
@@ -843,16 +1052,16 @@ I8+VCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCVCV
           boxShadow: '0 4px 20px rgba(255,203,5,0.28)',
           whiteSpace: 'nowrap',
         }}>
-          ð· Scan More Cards
+          📷 Scan More Cards
         </button>
       )}
     </div>
   );
 }
 
-/* âââââââââââââââââââââââââââââââââââââââââââââââ
+/* ══════════════════════════════════════════════
    ROOT APP
-âââââââââââââââââââââââââââââââââââââââââââââââ */
+═══════════════════════════════════════════════ */
 
 function App() {
   const [screen, setScreen] = useState('home');
@@ -900,6 +1109,10 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
+d('root')).render(<App />);
 </script>
 </body>
 </html>

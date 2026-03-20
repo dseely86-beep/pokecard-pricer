@@ -283,7 +283,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
               </div>
               <div style={{ fontSize: '10px', color: '#6e7681' }}>#{selected.card.localId || selected.card.number}</div>
               <div style={{ fontWeight: 700, fontSize: '14px', marginTop: '4px', color: $c(selected.price) }}>
-                {$p(selected.price)}
+               ${$p(selected.price)}
               </div>
             </div>
             <button onClick={clear} style={{
@@ -950,8 +950,8 @@ function CollectionScreen({ collection, onBack, onDelete, onScan, onPriceEdit })
             }}>{idx + 1}</div>
 
             {/* Card image */}
-            {card.image || card.photo
-              ? <img src={card.image || card.photo} alt="" style={{
+            {card.photo || card.image
+              ? <img src={card.photo || card.image} alt="" style={{
                   width: '44px', height: '62px', objectFit: 'cover',
                   borderRadius: '4px', flexShrink: 0,
                 }} />

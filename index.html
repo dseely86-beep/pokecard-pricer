@@ -283,7 +283,7 @@ function CardIdentifier({ index, cellImg, onSelect }) {
               </div>
               <div style={{ fontSize: '10px', color: '#6e7681' }}>#{selected.card.localId || selected.card.number}</div>
               <div style={{ fontWeight: 700, fontSize: '14px', marginTop: '4px', color: $c(selected.price) }}>
-               ${$p(selected.price)}
+                {$p(selected.price)}
               </div>
             </div>
             <button onClick={clear} style={{
@@ -873,10 +873,12 @@ function IdentifyScreen({ cells, onBack, onAdd }) {
    COLLECTION SCREEN
 ═══════════════════════════════════════════════ */
 
-function CollectionScreen({ collection, onBack, onDelete, onScan, onPriceEdit }) {
+function CollectionScreen({ collection, onBack, onDelete, onScan, onPriceEdit, onNumberEdit }) {
   const [confirmId, setConfirmId] = useState(null);
   const [editPriceId, setEditPriceId] = useState(null);
   const [editPriceVal, setEditPriceVal] = useState('');
+  const [editNumId, setEditNumId] = useState(null);
+  const [editNumVal, setEditNumVal] = useState('');
 
   const sorted = useMemo(
     () => [...collection].sort((a, b) => (b.price || 0) - (a.price || 0)),
@@ -971,7 +973,33 @@ function CollectionScreen({ collection, onBack, onDelete, onScan, onPriceEdit })
               <div style={{
                 fontSize: '10px', color: '#6e7681',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>{card.set}{card.number ? ` · #${card.number}` : ''}</div>
+              }}>
+                {card.set}
+                {editNumId === card.id ? (
+                  <span> · #<input
+                    autoFocus
+                    type="text"
+                    value={editNumVal}
+                    onChange={e => setEditNumVal(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { onNumberEdit(card.id, editNumVal.trim()); setEditNumId(null); }
+                      if (e.key === 'Escape') setEditNumId(null);
+                    }}
+                    onBlur={() => { onNumberEdit(card.id, editNumVal.trim()); setEditNumId(null); }}
+                    style={{
+                      width: '46px', padding: '1px 3px', fontSize: '10px',
+                      background: '#0d1117', border: '1px solid #58a6ff',
+                      borderRadius: '3px', color: '#e6edf3', fontFamily: 'inherit',
+                    }}
+                  /></span>
+                ) : (
+                  <span
+                    onClick={() => { setEditNumId(card.id); setEditNumVal(card.number || ''); }}
+                    title="Tap to edit card number"
+                    style={{ cursor: 'pointer' }}
+                  >{card.number ? ` · #${card.number}` : ' · #?'}</span>
+                )}
+              </div>
               <div style={{ fontSize: '10px', color: '#484f58' }}>
                 {new Date(card.scannedAt).toLocaleDateString()}
               </div>
@@ -1103,6 +1131,7 @@ function App() {
       onScan={go('scan')}
       onDelete={id => setColl(p => p.filter(c => c.id !== id))}
       onPriceEdit={(id, price) => setColl(p => p.map(c => c.id === id ? { ...c, price } : c))}
+      onNumberEdit={(id, number) => setColl(p => p.map(c => c.id === id ? { ...c, number } : c))}
     />
   );
 
